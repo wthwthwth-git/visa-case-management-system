@@ -1,0 +1,446 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum CasePhase {
+  draft
+  collecting_documents
+  preparing_application
+  submitted
+  under_review
+  approved
+}
+
+enum RequirementStatus {
+  not_submitted
+  submitted
+  needs_more
+  approved
+  not_applicable
+}
+
+enum ResponsibleParty {
+  customer
+  office
+}
+
+enum RequirementSourceType {
+  template
+  custom
+  immigration_request
+  system
+}
+
+enum DocumentFileStatus {
+  uploaded
+  removed
+  replaced
+}
+
+enum TokenStatus {
+  active
+  revoked
+  expired
+}
+
+enum DocumentTemplateStatus {
+  draft
+  active
+  archived
+}
+
+enum ApplicationConfirmationStatus {
+  pending
+  confirmed
+  needs_revision
+  superseded
+}
+
+enum ActorType {
+  internal
+  client
+  system
+}
+
+enum TimelineEventType {
+  case_created
+  case_phase_changed
+  token_created
+  token_revoked
+  token_regenerated
+  template_created
+  template_updated
+  template_version_created
+  template_items_copied
+  requirement_created
+  requirement_status_changed
+  file_uploaded
+  file_removed
+  file_replaced
+  internal_note_created
+  internal_note_updated
+  application_confirmation_created
+  application_confirmation_version_created
+  application_confirmation_completed
+  application_confirmation_status_changed
+}
+
+enum TimelineTargetType {
+  case
+  customer_access_token
+  document_template
+  document_template_item
+  case_document_requirement
+  document_file
+  application_confirmation
+  internal_note
+}
+
+enum AdminRole {
+  admin
+}
+
+enum AdminUserStatus {
+  active
+  disabled
+}
+
+enum AdminAuthAuditEventType {
+  login_success
+  login_failure
+  logout
+  session_expired
+  csrf_failure
+  rate_limit_triggered
+  suspicious_admin_request
+}
+
+enum AdminAuthAuditResult {
+  success
+  failure
+  blocked
+}
+
+model Customer {
+  id                  String    @id @default(uuid()) @db.Uuid
+  name                String
+  email               String?
+  phone               String?
+  address             String?   @db.Text
+  nationality         String?
+  birthday            DateTime? @db.Date
+  passportNumber      String?
+  residenceCardNumber String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  cases Case[]
+
+  @@index([name])
+  @@index([email])
+  @@index([phone])
+}
+
+model Case {
+  id              String    @id @default(uuid()) @db.Uuid
+  customerId      String    @db.Uuid
+  caseNumber      String    @unique
+  currentVisaType String
+  targetVisaType  String
+  casePhase       CasePhase @default(draft)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  customer                 Customer                  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  accessTokens             CustomerAccessToken[]
+  documentRequirements     CaseDocumentRequirement[]
+  documentFiles            DocumentFile[]
+  applicationConfirmations ApplicationConfirmation[]
+  internalNotes            InternalNote[]
+  timelineEvents           TimelineEvent[]
+
+  @@index([customerId])
+  @@index([casePhase])
+  @@index([currentVisaType])
+  @@index([targetVisaType])
+  @@index([updatedAt])
+}
+
+model CustomerAccessToken {
+  id         String      @id @default(uuid()) @db.Uuid
+  caseId     String      @db.Uuid
+  tokenHash  String      @unique
+  status     TokenStatus @default(active)
+  expiresAt  DateTime?
+  revokedAt  DateTime?
+  lastUsedAt DateTime?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  // Enforce one active token per case with a PostgreSQL partial unique index in a raw SQL migration.
+  @@index([caseId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model DocumentTemplate {
+  id                  String                 @id @default(uuid()) @db.Uuid
+  templateKey         String
+  version             Int
+  title               String
+  templateDescription String?                @db.Text
+  currentVisaType     String?
+  targetVisaType      String?
+  status              DocumentTemplateStatus @default(draft)
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  items DocumentTemplateItem[]
+
+  @@unique([templateKey, version])
+  @@index([templateKey])
+  @@index([status])
+  @@index([currentVisaType, targetVisaType])
+}
+
+model DocumentTemplateItem {
+  id                           String           @id @default(uuid()) @db.Uuid
+  templateId                   String           @db.Uuid
+  itemKey                      String
+  title                        String
+  customerInstruction          String?          @db.Text
+  internalNote                 String?          @db.Text
+  isRequired                   Boolean          @default(true)
+  responsibleParty             ResponsibleParty @default(customer)
+  sortOrder                    Int              @default(0)
+  acceptedFileTypesDescription String?          @db.Text
+  createdAt                    DateTime         @default(now())
+  updatedAt                    DateTime         @updatedAt
+
+  template DocumentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, itemKey])
+  @@index([templateId, sortOrder])
+  @@index([responsibleParty])
+}
+
+model CaseDocumentRequirement {
+  id                           String                @id @default(uuid()) @db.Uuid
+  caseId                       String                @db.Uuid
+  title                        String
+  customerInstruction          String?               @db.Text
+  internalNote                 String?               @db.Text
+  isRequired                   Boolean               @default(true)
+  responsibleParty             ResponsibleParty      @default(customer)
+  sourceType                   RequirementSourceType @default(custom)
+  status                       RequirementStatus     @default(not_submitted)
+  sortOrder                    Int                   @default(0)
+  acceptedFileTypesDescription String?               @db.Text
+  portalVisible                Boolean               @default(false)
+  portalDownloadable           Boolean               @default(false)
+  /// Snapshot trace only. Do not read live template content through these fields.
+  sourceTemplateId             String?               @db.Uuid
+  sourceTemplateVersion        Int?
+  sourceTemplateItemId         String?               @db.Uuid
+  immigrationRequestSource     String?               @db.Text
+  requestedAt                  DateTime?
+  dueDate                      DateTime?
+  createdAt                    DateTime              @default(now())
+  updatedAt                    DateTime              @updatedAt
+
+  case  Case           @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  files DocumentFile[]
+
+  @@index([caseId])
+  @@index([caseId, responsibleParty])
+  @@index([caseId, sourceType])
+  @@index([caseId, status])
+  @@index([caseId, portalVisible])
+  @@index([caseId, sortOrder])
+  @@index([sourceTemplateId])
+  @@index([sourceTemplateItemId])
+  @@index([dueDate])
+}
+
+model DocumentFile {
+  id                 String             @id @default(uuid()) @db.Uuid
+  caseId             String             @db.Uuid
+  requirementId      String             @db.Uuid
+  storageBucket      String
+  storagePath        String
+  originalFileName   String
+  mimeType           String
+  fileSize           BigInt
+  status             DocumentFileStatus @default(uploaded)
+  uploadedByType     ActorType
+  portalVisible      Boolean            @default(false)
+  portalDownloadable Boolean            @default(false)
+  removedByType      ActorType?
+  removeReason       String?            @db.Text
+  removedAt          DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  case        Case                    @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  requirement CaseDocumentRequirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+
+  @@unique([storageBucket, storagePath])
+  @@index([caseId])
+  @@index([requirementId])
+  @@index([requirementId, status])
+  @@index([caseId, portalVisible])
+  @@index([caseId, portalDownloadable])
+}
+
+model ApplicationConfirmation {
+  id            String                        @id @default(uuid()) @db.Uuid
+  caseId        String                        @db.Uuid
+  title         String
+  version       Int
+  storageBucket String
+  storagePath   String
+  status        ApplicationConfirmationStatus @default(pending)
+  confirmedAt   DateTime?
+  supersededAt  DateTime?
+  createdAt     DateTime                      @default(now())
+  updatedAt     DateTime                      @updatedAt
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@unique([caseId, title, version])
+  @@unique([storageBucket, storagePath])
+  @@index([caseId])
+  @@index([caseId, status])
+  @@index([caseId, title])
+}
+
+model InternalNote {
+  id         String              @id @default(uuid()) @db.Uuid
+  caseId     String              @db.Uuid
+  targetType TimelineTargetType?
+  targetId   String?             @db.Uuid
+  body       String              @db.Text
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+}
+
+model TimelineEvent {
+  id         String              @id @default(uuid()) @db.Uuid
+  caseId     String?             @db.Uuid
+  eventType  TimelineEventType
+  actorType  ActorType
+  summary    String
+  targetType TimelineTargetType?
+  targetId   String?             @db.Uuid
+  /// Must not contain plaintext tokens, signed URLs, passport numbers, or other sensitive raw values.
+  metadata   Json?
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  case Case? @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId, createdAt])
+  @@index([caseId, eventType])
+  @@index([targetType, targetId])
+  @@index([actorType])
+}
+
+/// Auth.js Admin user model. It is not Customer.
+/// Customer is the visa applicant/client business model.
+model User {
+  id            String          @id @default(cuid())
+  name          String?
+  email         String?         @unique
+  emailVerified DateTime?
+  image         String?
+  role          AdminRole       @default(admin)
+  status        AdminUserStatus @default(active)
+  lastLoginAt   DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  accounts   Account[]
+  sessions   Session[]
+  authAudits AdminAuthAudit[]
+
+  @@index([role])
+  @@index([status])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expires])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@index([expires])
+}
+
+model AdminAuthAudit {
+  id          String                  @id @default(cuid())
+  adminUserId String?
+  email       String?
+  eventType   AdminAuthAuditEventType
+  result      AdminAuthAuditResult
+  ipAddress   String?
+  userAgent   String?                 @db.Text
+  requestPath String?
+  method      String?
+  reason      String?                 @db.Text
+  /// Must not contain passwords, raw session tokens, CSRF tokens, Portal tokens, token hashes, signed URLs, storage paths, storage buckets, secrets, raw cookies, or authorization headers.
+  metadata    Json?
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  adminUser User? @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+
+  @@index([adminUserId, createdAt])
+  @@index([email, createdAt])
+  @@index([eventType, createdAt])
+  @@index([result, createdAt])
+  @@index([createdAt])
+}

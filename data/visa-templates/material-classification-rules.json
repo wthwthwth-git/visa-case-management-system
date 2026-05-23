@@ -1,0 +1,1420 @@
+{
+  "schemaVersion": 1,
+  "classificationGoal": "Classify template materials into customer-provided materials and office-prepared materials before case creation preview.",
+  "responsiblePartyValues": {
+    "customer": "Shown in Portal and Admin customer materials section.",
+    "office": "Shown only in Admin office materials section by default."
+  },
+  "officePatterns": [
+    "申请书",
+    "申請書",
+    "申請",
+    "理由书",
+    "理由書",
+    "说明书",
+    "説明書",
+    "内容说明",
+    "事业计划书",
+    "事業計画書",
+    "计划书",
+    "計画書",
+    "计算表",
+    "計算表",
+    "保证书",
+    "保証書",
+    "质问书",
+    "質問書",
+    "提交人资料",
+    "代理提交人资料",
+    "接收方",
+    "所属机关资料",
+    "法人登记",
+    "定款",
+    "公司概要",
+    "办公室资料",
+    "资本金",
+    "常勤职员",
+    "役员报酬",
+    "劳动条件",
+    "雇佣契约",
+    "雇用理由",
+    "职务内容",
+    "工作内容说明",
+    "招聘理由",
+    "邀请理由",
+    "支援计划书"
+  ],
+  "customerPatterns": [
+    "护照",
+    "在留卡",
+    "证件照",
+    "照片",
+    "住民票",
+    "学历",
+    "学位",
+    "成绩",
+    "毕业",
+    "职历",
+    "履历",
+    "收入",
+    "纳税",
+    "年金",
+    "健康保险",
+    "银行",
+    "存款",
+    "经费",
+    "亲属",
+    "婚姻",
+    "结婚",
+    "出生",
+    "户口",
+    "身份证",
+    "日语能力",
+    "日本语能力",
+    "资格",
+    "证明",
+    "实绩",
+    "经历",
+    "活动证明",
+    "勤務证明",
+    "扶养"
+  ],
+  "defaultWhenNoPatternMatches": "customer",
+  "manualReviewPolicy": "Items with low confidence or broad material wording should be reviewed before production import.",
+  "materialTitleClassification": [
+    {
+      "title": "专业技术活动持续资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "专业资格或日语能力资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "日语能力",
+        "资格"
+      ],
+      "confidence": "high",
+      "needsManualReview": true
+    },
+    {
+      "title": "世带全员住民票",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "住民票"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "个案补充资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "了解书、资产资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "事业计划书或经营改善说明",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "事业计划书",
+        "计划书"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "亲属关系和身份关系证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "亲属",
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "亲属关系持续证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "亲属",
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "亲属关系证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "亲属",
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "住民票",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "住民票"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "住民税、社会保险、年金缴纳确认资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "年金"
+      ],
+      "confidence": "high",
+      "needsManualReview": true
+    },
+    {
+      "title": "住民税课税及纳税证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "纳税",
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "住民税课税和纳税证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "纳税",
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "住民税课税证明及纳税证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "纳税",
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "入学许可书",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "公司停止或退出说明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "公司公租公课履行资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "公司登记、会社案内、决算书",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "公司经营状况资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "共同生活或扶养安排说明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "扶养"
+      ],
+      "confidence": "high",
+      "needsManualReview": true
+    },
+    {
+      "title": "出席率证明书",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "分野别更新资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "分野别确认资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "办公室资料",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "办公室资料"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "升学或继续学习资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "原派遣关系和所属机构资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "变更必要性说明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "变更理由书",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "理由书"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "可申请路径确认资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "在学证明、成绩证明、出席率证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "成绩",
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "在学证明书",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "在日亲属资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "亲属"
+      ],
+      "confidence": "high",
+      "needsManualReview": true
+    },
+    {
+      "title": "在日生活基础资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "在留卡",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "在留卡"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "在留卡有效期间更新申请书",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "申请书"
+      ],
+      "confidence": "medium",
+      "needsManualReview": false
+    },
+    {
+      "title": "在留期間更新許可申請書",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "申請書",
+        "申請"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "在留资格変更許可申請書",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "申請書",
+        "申請"
+      ],
+      "confidence": "medium",
+      "needsManualReview": false
+    },
+    {
+      "title": "在留资格认定证明书交付申请书",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "申请书"
+      ],
+      "confidence": "medium",
+      "needsManualReview": false
+    },
+    {
+      "title": "在职证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "在职证明或转勤继续证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "夫妻交流资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "婚姻关系变化资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "婚姻"
+      ],
+      "confidence": "high",
+      "needsManualReview": true
+    },
+    {
+      "title": "婚姻关系持续证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "婚姻",
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "婚姻生活资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "婚姻"
+      ],
+      "confidence": "high",
+      "needsManualReview": true
+    },
+    {
+      "title": "学习理由书、履历书",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "理由书"
+      ],
+      "confidence": "medium",
+      "needsManualReview": false
+    },
+    {
+      "title": "学历、专业、职历证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "学历",
+        "职历",
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "学历、成绩、日语学习证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "学历",
+        "成绩",
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "学历和学位证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "学历",
+        "学位",
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "学校类别对应资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "定住理由书",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "理由书"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "定住理由延续或变化说明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "定住理由持续证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "常勤职员雇用资料",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "常勤职员"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "年金、健康保险、国税资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "年金",
+        "健康保险"
+      ],
+      "confidence": "high",
+      "needsManualReview": true
+    },
+    {
+      "title": "店铺或公司实态资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "店铺或公司经营资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "役员报酬或劳动条件资料",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "役员报酬",
+        "劳动条件"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "成绩证明书",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "成绩",
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "户籍謄本",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "所属机关变更或退职说明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "所属机关类别证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "所属机关资料",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "所属机关资料"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "所属机构资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "所属研究机构或大学资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "扶养人的在留卡和住民票",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "在留卡",
+        "住民票",
+        "扶养"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "扶养人的在职、在学或活动证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "证明",
+        "活动证明",
+        "扶养"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "扶养人的活动证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "证明",
+        "活动证明",
+        "扶养"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "扶养人身份证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "身份证",
+        "证明",
+        "扶养"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "扶养关系和生活状况资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "扶养"
+      ],
+      "confidence": "high",
+      "needsManualReview": true
+    },
+    {
+      "title": "扶养能力资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "扶养"
+      ],
+      "confidence": "high",
+      "needsManualReview": true
+    },
+    {
+      "title": "技能与日语证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "技能工作实态资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "技能水准证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "技能活动继续说明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "技能经历证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "证明",
+        "经历"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "护照",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "护照"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "护照复印件",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "护照"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "接收机关适合性资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "支弁者直近 1 年分住民税资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "支援实施和届出资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "支援实施状况资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "支援计划书",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "计划书",
+        "支援计划书"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "收入、纳税、住居资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "收入",
+        "纳税"
+      ],
+      "confidence": "high",
+      "needsManualReview": true
+    },
+    {
+      "title": "收入和职业证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "收入",
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "教授・研究・教育对应资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "日本人配偶的户籍謄本",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "日本接收方或代理提交人资料",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "提交人资料",
+        "代理提交人资料",
+        "接收方"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "日本接收机构资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "日本语能力资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "日本语能力"
+      ],
+      "confidence": "high",
+      "needsManualReview": true
+    },
+    {
+      "title": "日语能力证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "日语能力",
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "最近年度决算书",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "本人确认资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "永住理由书",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "理由书"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "永住者不能从无在留资格直接申请",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "资格"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "永住者身份确认资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "永住者配偶的住民票",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "住民票"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "永住許可申請書",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "申請書",
+        "申請"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "法人登记事项证明书",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "法人登记"
+      ],
+      "confidence": "medium",
+      "needsManualReview": false
+    },
+    {
+      "title": "法人登记事项证明书、定款、公司概要",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "法人登记",
+        "定款",
+        "公司概要"
+      ],
+      "confidence": "medium",
+      "needsManualReview": false
+    },
+    {
+      "title": "海外公司与日本公司关系证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "海外关联关系资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "海外机构存在证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "滞在费用证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "特定技能雇用契约书",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "特殊情况证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "现有在留资格下的活动证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "资格",
+        "证明",
+        "活动证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "生活基础资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "申请人国籍国结婚证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "结婚",
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "申请人的资格外活动资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "资格"
+      ],
+      "confidence": "high",
+      "needsManualReview": true
+    },
+    {
+      "title": "研究实绩资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "实绩"
+      ],
+      "confidence": "high",
+      "needsManualReview": true
+    },
+    {
+      "title": "研究或教育活动内容说明",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "内容说明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "研究或教育活动持续资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "研究或教育活动继续证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "社会保险、劳动保险、税务资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "积分证明资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": true
+    },
+    {
+      "title": "纳税、年金、健康保险履行资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "纳税",
+        "年金",
+        "健康保险"
+      ],
+      "confidence": "high",
+      "needsManualReview": true
+    },
+    {
+      "title": "经专业人士确认的事业计划书",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "事业计划书",
+        "计划书"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "经营实态资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "经营管理活动持续资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "经营管理经验或学历资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "学历"
+      ],
+      "confidence": "high",
+      "needsManualReview": true
+    },
+    {
+      "title": "经费支弁书",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "经费"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "经费支弁资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "经费"
+      ],
+      "confidence": "high",
+      "needsManualReview": true
+    },
+    {
+      "title": "经费能力证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "经费",
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "结婚证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "结婚",
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "职业和收入资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "收入"
+      ],
+      "confidence": "high",
+      "needsManualReview": true
+    },
+    {
+      "title": "职务内容说明书",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "说明书",
+        "内容说明",
+        "职务内容"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "职务内容说明书、雇用理由书",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "理由书",
+        "说明书",
+        "内容说明",
+        "雇用理由",
+        "职务内容"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "职历证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "职历",
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "许可、决算、税务资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "证件照",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "证件照"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "语言能力相关资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "语言能力资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "调令、派遣状或异动通知书",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "调令或派遣期间延长证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "质问书",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "质问书"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "资本金、常勤职员和日语能力资料",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "资本金",
+        "常勤职员"
+      ],
+      "confidence": "medium",
+      "needsManualReview": false
+    },
+    {
+      "title": "资本金和常勤职员资料",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "资本金",
+        "常勤职员"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "资本金或出资总额证明",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "资本金"
+      ],
+      "confidence": "medium",
+      "needsManualReview": false
+    },
+    {
+      "title": "资格外活动记录",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "资格"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "资格外活动资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "资格"
+      ],
+      "confidence": "high",
+      "needsManualReview": true
+    },
+    {
+      "title": "身元保证书",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "保证书"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "身元保证书和保证人资料",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "保证书"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "转勤结束或调动说明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "过去 1 年以上海外勤務证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "证明",
+        "勤務证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "退职证明或在职证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "雇佣契约、任用通知或接收证明",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "雇佣契约"
+      ],
+      "confidence": "medium",
+      "needsManualReview": false
+    },
+    {
+      "title": "雇佣契约书或劳动条件通知书",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "劳动条件",
+        "雇佣契约"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "雇用理由书",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "理由书",
+        "雇用理由"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "雇用理由书、工作内容说明书",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "理由书",
+        "说明书",
+        "内容说明",
+        "雇用理由",
+        "工作内容说明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "预计年收入证明",
+      "responsibleParty": "customer",
+      "matchedPatterns": [
+        "收入",
+        "证明"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    },
+    {
+      "title": "高度人才积分维持资料",
+      "responsibleParty": "customer",
+      "matchedPatterns": [],
+      "confidence": "low",
+      "needsManualReview": true
+    },
+    {
+      "title": "高度人才积分计算表",
+      "responsibleParty": "office",
+      "matchedPatterns": [
+        "计算表"
+      ],
+      "confidence": "high",
+      "needsManualReview": false
+    }
+  ]
+}

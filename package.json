@@ -1,0 +1,48 @@
+{
+  "name": "vise-info-management",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "test": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test:integration": "vitest run \"**/*.integration.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings=0",
+    "prisma:generate": "prisma generate",
+    "prisma:format": "prisma format",
+    "prisma:validate": "prisma validate",
+    "seed": "tsx prisma/seed.ts",
+    "templates:import": "tsx prisma/import-visa-templates.ts",
+    "test:token-constraint": "tsx prisma/test-token-constraint.ts"
+  },
+  "dependencies": {
+    "@auth/prisma-adapter": "^2.11.2",
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "@supabase/supabase-js": "^2.106.1",
+    "@upstash/redis": "^1.38.0",
+    "dotenv": "^17.4.2",
+    "next": "^16.2.6",
+    "next-auth": "^4.24.14",
+    "pg": "^8.21.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.9.1",
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
+    "autoprefixer": "^10.5.0",
+    "eslint": "^10.4.0",
+    "postcss": "^8.5.15",
+    "prisma": "^7.8.0",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.22.3",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.4",
+    "vitest": "^4.1.7"
+  }
+}
