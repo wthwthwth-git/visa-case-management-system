@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { displayChineseText, displayVisaType } from "@/app/_lib/chinese-display";
 import {
@@ -42,6 +43,7 @@ type ApiFailure = {
 };
 
 type ActiveModal =
+  | { type: "customer"; customer: AdminCaseDetail["customer"] }
   | { type: "review"; requirement: AdminRequirement }
   | { type: "upload"; requirement: AdminRequirement }
   | { type: "note"; requirement: AdminRequirement }
@@ -58,6 +60,197 @@ type MutationResult = {
   message: string;
   warningMessage?: string;
 };
+
+type RequirementLookup = {
+  byRequirementId: Map<string, AdminRequirement>;
+  byFileId: Map<string, AdminRequirement>;
+};
+
+function buildRequirementLookup(requirements: AdminRequirement[]): RequirementLookup {
+  const byRequirementId = new Map<string, AdminRequirement>();
+  const byFileId = new Map<string, AdminRequirement>();
+
+  for (const requirement of requirements) {
+    byRequirementId.set(requirement.id, requirement);
+
+    for (const file of requirement.files) {
+      byFileId.set(file.id, requirement);
+    }
+  }
+
+  return { byRequirementId, byFileId };
+}
+
+function getMetadataValue(event: AdminTimelineEvent, key: string): unknown {
+  if (!event.metadata || typeof event.metadata !== "object" || Array.isArray(event.metadata)) {
+    return undefined;
+  }
+
+  return (event.metadata as Record<string, unknown>)[key];
+}
+
+function getMetadataString(event: AdminTimelineEvent, key: string): string | null {
+  const value = getMetadataValue(event, key);
+  return typeof value === "string" ? value : null;
+}
+
+function getRequirementFromEvent(event: AdminTimelineEvent, lookup: RequirementLookup): AdminRequirement | null {
+  const requirementId =
+    getMetadataString(event, "requirementId") ||
+    (event.targetType === "case_document_requirement" ? event.targetId : null);
+
+  if (requirementId) {
+    return lookup.byRequirementId.get(requirementId) ?? null;
+  }
+
+  const fileId =
+    getMetadataString(event, "fileId") ||
+    (event.targetType === "document_file" ? event.targetId : null);
+
+  return fileId ? lookup.byFileId.get(fileId) ?? null : null;
+}
+
+function getRequirementScopeLabel(requirement: AdminRequirement | null): string {
+  if (!requirement) {
+    return "资料项";
+  }
+
+  if (requirement.sourceType === "immigration_request") {
+    return requirement.responsibleParty === "customer" ? "入管追加材料（客户资料）" : "入管追加材料（事务所资料）";
+  }
+
+  return requirement.responsibleParty === "customer" ? "客户资料" : "事务所资料";
+}
+
+function formatChangeHistoryDetail(event: AdminTimelineEvent, lookup: RequirementLookup): string {
+  const requirement = getRequirementFromEvent(event, lookup);
+  const requirementTitle = requirement ? `「${displayChineseText(requirement.title)}」` : "";
+  const scope = getRequirementScopeLabel(requirement);
+
+  switch (event.eventType) {
+    case "file_uploaded":
+      return `${scope}${requirementTitle}已上传文件。`;
+    case "file_deleted":
+      return `${scope}${requirementTitle}已删除文件。`;
+    case "requirement_status_changed": {
+      const oldStatus = getMetadataString(event, "oldStatus");
+      const newStatus = getMetadataString(event, "newStatus");
+      const statusText = oldStatus && newStatus
+        ? `状态由「${displayLabel(oldStatus)}」变更为「${displayLabel(newStatus)}」。`
+        : "状态已变更。";
+      return `${scope}${requirementTitle}${statusText}`;
+    }
+    case "requirement_note_updated":
+      return `${scope}${requirementTitle}备注已更新。`;
+    case "requirement_created":
+      return `${scope}${requirementTitle}已追加。`;
+    case "requirement_deleted":
+      return `${scope}${requirementTitle}已删除。`;
+    case "case_phase_changed": {
+      const oldPhase = getMetadataString(event, "oldPhase");
+      const newPhase = getMetadataString(event, "newPhase");
+      return oldPhase && newPhase
+        ? `案件阶段由「${displayLabel(oldPhase)}」变更为「${displayLabel(newPhase)}」。`
+        : "案件阶段已变更。";
+    }
+    case "template_items_selected_copied": {
+      const selectedCount = getMetadataValue(event, "selectedItemCount");
+      const customCount = getMetadataValue(event, "customItemCount");
+      const selectedText = typeof selectedCount === "number" ? `${selectedCount} 项模板资料` : "模板资料";
+      const customText = typeof customCount === "number" && customCount > 0 ? `，另追加 ${customCount} 项自定义资料` : "";
+      return `已生成${selectedText}${customText}。`;
+    }
+    case "custom_requirements_created": {
+      const customCount = getMetadataValue(event, "customItemCount");
+      return typeof customCount === "number" ? `已追加 ${customCount} 项自定义资料。` : "已追加自定义资料。";
+    }
+    case "token_created":
+      return "客户访问链接已创建。";
+    case "token_regenerated":
+      return "客户访问链接已重新生成，旧链接已失效。";
+    case "token_revoked":
+      return "客户访问链接已撤销。";
+    case "application_confirmation_created":
+    case "application_confirmation_version_created":
+      return "申请书确认版本已创建。";
+    case "application_confirmation_completed":
+      return "客户已完成申请书确认。";
+    case "application_confirmation_status_changed":
+      return "申请书确认状态已变更。";
+    case "case_created":
+      return "案件已创建。";
+    default:
+      return displayLabel(event.eventType);
+  }
+}
+
+function getLatestCasePhaseReason(events: AdminTimelineEvent[]) {
+  for (const event of events) {
+    if (event.eventType !== "case_phase_changed") {
+      continue;
+    }
+
+    const reason = getMetadataString(event, "reason")?.trim();
+
+    if (reason) {
+      return reason;
+    }
+  }
+
+  return null;
+}
+
+function createPortalAccessUrl(plaintextToken: string): string {
+  if (typeof window === "undefined") {
+    return `/portal/${encodeURIComponent(plaintextToken)}`;
+  }
+
+  return `${window.location.origin}/portal/${encodeURIComponent(plaintextToken)}`;
+}
+
+function getVisibleRequirementInternalNote(
+  requirement: Pick<AdminRequirement, "internalNote" | "responsibleParty" | "status">,
+) {
+  const note = requirement.internalNote?.trim();
+
+  if (!note || /^classification=/i.test(note)) {
+    return null;
+  }
+
+  const clientRevisionPrefix = "客户要求的说明：";
+  const isConfirmedOfficeRequirement =
+    requirement.responsibleParty === "office" && requirement.status === "not_applicable";
+
+  if (isConfirmedOfficeRequirement && note.startsWith(clientRevisionPrefix)) {
+    return null;
+  }
+
+  return note;
+}
+
+function getRequirementNoteDisplay(
+  requirement: Pick<AdminRequirement, "internalNote" | "responsibleParty" | "status">,
+) {
+  const note = getVisibleRequirementInternalNote(requirement);
+
+  if (!note) {
+    return null;
+  }
+
+  const clientRevisionPrefix = "客户要求的说明：";
+
+  if (note.startsWith(clientRevisionPrefix)) {
+    return {
+      label: "客户要求的说明",
+      text: note.slice(clientRevisionPrefix.length).trim(),
+    };
+  }
+
+  return {
+    label: "内部备注",
+    text: note,
+  };
+}
 
 type CasePhaseWarning = {
   type: string;
@@ -101,6 +294,15 @@ type RequirementDeleteConfirmation = {
   uploadedFileCount: number;
 };
 
+type RemovedAdminCaseResult = {
+  caseId: string;
+  caseNumber: string;
+  removedRequirementCount: number;
+  removedFileCount: number;
+  removedApplicationConfirmationCount: number;
+  removedAccessTokenCount: number;
+};
+
 type CreatedApplicationConfirmationResult = {
   id: string;
   caseId: string;
@@ -131,6 +333,47 @@ const casePhaseSteps = [
   "under_review",
   "approved",
 ];
+
+const casePhaseTransitionOptions: Record<string, string[]> = {
+  draft: ["collecting_documents"],
+  collecting_documents: ["preparing_application"],
+  preparing_application: ["submitted", "collecting_documents"],
+  submitted: ["under_review", "preparing_application"],
+  under_review: ["approved", "submitted", "collecting_documents"],
+  approved: [],
+};
+
+function getAllowedCasePhaseOptions(currentPhase: string) {
+  return (casePhaseTransitionOptions[currentPhase] ?? []).filter((phase) =>
+    casePhaseSteps.includes(phase),
+  );
+}
+
+function formatCasePhaseSubmitError(error: unknown) {
+  const message = toAdminErrorMessage(error, "案件阶段切换失败。请检查阶段和原因后重试。");
+
+  if (message === "Invalid request." || /transition|not allowed/i.test(message)) {
+    return "该阶段不能从当前阶段直接切换。请按案件流程选择允许的下一阶段。";
+  }
+
+  return message;
+}
+
+function formatVisaBusinessSummary(currentVisaType: string, targetVisaType: string) {
+  const current = displayVisaType(currentVisaType);
+  const target = displayVisaType(targetVisaType);
+
+  if (currentVisaType === "无") {
+    return `认定 / ${target}`;
+  }
+
+  if (currentVisaType === targetVisaType) {
+    return `更新 / ${target}`;
+  }
+
+  return `变更 / ${current} → ${target}`;
+}
+
 const todayDateValue = new Date().toISOString().slice(0, 10);
 
 async function parseMutationResponse<T>(response: Response): Promise<T> {
@@ -258,6 +501,7 @@ function formatChangeHistorySummary(value: string) {
     "previous portal token revoked during regeneration.": "旧客户访问链接已撤销",
     "internal note created.": "备注已创建",
     "internal note updated.": "备注已更新",
+    "file uploaded.": "文件已上传",
     "document file uploaded.": "文件已上传",
     "file removed.": "文件已删除",
     "requirement status changed.": "材料状态已变更",
@@ -276,6 +520,14 @@ function getUploadedRequirementFiles(requirement: AdminRequirement) {
 }
 
 function getEffectiveRequirementStatus(requirement: AdminRequirement) {
+  if (requirement.responsibleParty === "office") {
+    if (requirement.status === "approved" || requirement.status === "not_applicable") {
+      return requirement.status;
+    }
+
+    return "submitted";
+  }
+
   const uploadedFileCount = getUploadedRequirementFiles(requirement).length;
 
   if (requirement.status === "not_submitted" && uploadedFileCount > 0) {
@@ -287,6 +539,22 @@ function getEffectiveRequirementStatus(requirement: AdminRequirement) {
   }
 
   return requirement.status;
+}
+
+function getRequirementStatusBadgeValue(requirement: AdminRequirement) {
+  if (requirement.responsibleParty === "office") {
+    if (requirement.status === "not_applicable") {
+      return "office_confirmed";
+    }
+
+    return requirement.status === "approved" ? "office_completed" : "office_in_progress";
+  }
+
+  return getEffectiveRequirementStatus(requirement);
+}
+
+function getRequirementReviewButtonLabel(requirement: AdminRequirement) {
+  return requirement.responsibleParty === "office" ? "制作状态变更" : "审核状态变更";
 }
 
 function canPreviewInModal(file: AdminRequirementFile): boolean {
@@ -425,15 +693,10 @@ function RequirementGroup({
       <div className="flex flex-wrap items-center gap-2" onClick={(event) => event.stopPropagation()}>
         {action}
         {collapsible ? (
-          <button
-            type="button"
+          <CollapseIconButton
+            isExpanded={isExpanded}
             onClick={() => setIsExpanded((current) => !current)}
-            aria-label={isExpanded ? "隐藏内容" : "展开内容"}
-            title={isExpanded ? "隐藏内容" : "展开内容"}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-lg font-semibold leading-none text-slate-500 outline-none hover:bg-slate-50 hover:text-blue-700 focus-visible:ring-2 focus-visible:ring-blue-100"
-          >
-            {isExpanded ? "∧" : "∨"}
-          </button>
+          />
         ) : null}
       </div>
     ) : undefined;
@@ -480,7 +743,9 @@ function RequirementGroup({
         ) : null}
         {requirements.map((requirement) => {
           const uploadedFiles = getUploadedRequirementFiles(requirement);
-          const effectiveStatus = getEffectiveRequirementStatus(requirement);
+          const statusBadgeValue = getRequirementStatusBadgeValue(requirement);
+          const visibleInternalNote = getVisibleRequirementInternalNote(requirement);
+          const visibleNoteDisplay = getRequirementNoteDisplay(requirement);
           const isDownloadingAll = downloadingRequirementId === requirement.id;
           const isDeletingAll = deletingRequirementId === requirement.id;
           const isDeletingRequirement = deletingRequirementRecordId === requirement.id;
@@ -495,7 +760,7 @@ function RequirementGroup({
               <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <div className="font-medium text-slate-950">{displayChineseText(requirement.title)}</div>
               </div>
-              <StatusBadge value={effectiveStatus} />
+              <StatusBadge value={statusBadgeValue} />
             </div>
             {uploadedFiles.length > 0 ? (
               <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
@@ -551,11 +816,13 @@ function RequirementGroup({
                 </div>
               </div>
             ) : null}
-            {requirement.internalNote ? (
+            {visibleNoteDisplay ? (
               <div className="mt-3 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-                <div className="mb-1 text-xs font-semibold text-amber-700">内部备注</div>
+                <div className="mb-1 text-xs font-semibold text-amber-700">
+                  {visibleNoteDisplay.label}
+                </div>
                 <div className="whitespace-pre-wrap break-words">
-                  {displayChineseText(requirement.internalNote)}
+                  {displayChineseText(visibleNoteDisplay.text)}
                 </div>
               </div>
             ) : null}
@@ -567,7 +834,7 @@ function RequirementGroup({
                     onClick={() => onReview(requirement)}
                     className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
                   >
-                    审核状态变更
+                    {getRequirementReviewButtonLabel(requirement)}
                   </button>
                 ) : null}
                 <button
@@ -582,7 +849,7 @@ function RequirementGroup({
                   onClick={() => onNote(requirement)}
                   className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                 >
-                  {requirement.internalNote ? "修改备注" : "添加备注"}
+                  {visibleInternalNote ? "修改备注" : "添加备注"}
                 </button>
               </div>
               <button
@@ -608,6 +875,29 @@ function RequirementGroup({
   );
 }
 
+function CollapseIconButton({
+  isExpanded,
+  onClick,
+}: {
+  isExpanded: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={isExpanded ? "收起" : "展开"}
+      title={isExpanded ? "收起" : "展开"}
+      className="inline-flex h-8 items-center gap-1 rounded-lg px-1.5 text-xs font-medium text-slate-500 outline-none transition hover:text-slate-800 focus-visible:ring-2 focus-visible:ring-blue-100"
+    >
+      <span>{isExpanded ? "收起" : "展开"}</span>
+      <span className="translate-y-[-1px] text-[9px] leading-none text-slate-400">
+        {isExpanded ? "▲" : "▼"}
+      </span>
+    </button>
+  );
+}
+
 function RequirementReviewForm({
   caseId,
   requirement,
@@ -623,10 +913,9 @@ function RequirementReviewForm({
 }) {
   const hasUploadedFiles = getUploadedRequirementFiles(requirement).length > 0;
   const needsCustomerInstruction = requirement.responsibleParty === "customer";
+  const isOfficeRequirement = requirement.responsibleParty === "office";
   const [newStatus, setNewStatus] = useState(getEffectiveRequirementStatus(requirement));
-  const [customerInstruction, setCustomerInstruction] = useState(
-    requirement.customerInstruction ?? "",
-  );
+  const [customerInstruction, setCustomerInstruction] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -640,6 +929,7 @@ function RequirementReviewForm({
     setError(null);
 
     if (
+      !isOfficeRequirement &&
       requirement.status === "approved" &&
       newStatus === "needs_more" &&
       !confirmImportantAction("该资料已通过审核，继续后会退回为“需补充”。")
@@ -663,7 +953,9 @@ function RequirementReviewForm({
         newStatus,
         ...(needsCustomerInstruction ? { customerInstruction } : {}),
       });
-      await onSuccess({ message: "资料审核状态已更新。" });
+      await onSuccess({
+        message: isOfficeRequirement ? "事务所资料制作状态已更新。" : "资料审核状态已更新。",
+      });
     } catch (submitError) {
       setError(toAdminErrorMessage(submitError, "资料审核失败。请检查状态和原因后重试。"));
     } finally {
@@ -684,11 +976,21 @@ function RequirementReviewForm({
           onChange={(event) => setNewStatus(event.target.value)}
           className="rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
         >
-          {!hasUploadedFiles ? <option value="not_submitted">未提交</option> : null}
-          <option value="submitted">已提交</option>
-          <option value="needs_more">需补充</option>
-          <option value="not_applicable">需修改</option>
-          <option value="approved">已通过</option>
+          {isOfficeRequirement ? (
+            <>
+              <option value="submitted">制作中</option>
+              <option value="approved">已完成</option>
+              <option value="not_applicable">已确认</option>
+            </>
+          ) : (
+            <>
+              {!hasUploadedFiles ? <option value="not_submitted">未提交</option> : null}
+              <option value="submitted">已提交</option>
+              <option value="needs_more">需补充</option>
+              <option value="not_applicable">需修改</option>
+              <option value="approved">已通过</option>
+            </>
+          )}
         </select>
       </div>
       {needsCustomerInstruction ? (
@@ -700,6 +1002,7 @@ function RequirementReviewForm({
             id="customerInstruction"
             value={customerInstruction}
             onChange={(event) => setCustomerInstruction(event.target.value)}
+            placeholder="向客户补充说明"
             className="min-h-24 rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
           />
         </div>
@@ -707,7 +1010,7 @@ function RequirementReviewForm({
       <FormActions
         isSubmitting={isSubmitting}
         onCancel={onCancel}
-        submitLabel="保存审核"
+        submitLabel={isOfficeRequirement ? "保存状态" : "保存审核"}
         submittingLabel="保存中..."
       />
     </form>
@@ -727,7 +1030,9 @@ function RequirementNoteForm({
   onSuccess: (result: MutationResult) => Promise<void>;
   onBusyChange: (isBusy: boolean) => void;
 }) {
-  const [internalNote, setInternalNote] = useState(requirement.internalNote ?? "");
+  const [internalNote, setInternalNote] = useState(
+    getVisibleRequirementInternalNote(requirement) ?? "",
+  );
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -771,6 +1076,114 @@ function RequirementNoteForm({
         isSubmitting={isSubmitting}
         onCancel={onCancel}
         submitLabel="保存备注"
+        submittingLabel="保存中..."
+      />
+    </form>
+  );
+}
+
+function CustomerEditForm({
+  customer,
+  onCancel,
+  onSuccess,
+  onBusyChange,
+}: {
+  customer: AdminCaseDetail["customer"];
+  onCancel: () => void;
+  onSuccess: (result: MutationResult) => Promise<void>;
+  onBusyChange: (isBusy: boolean) => void;
+}) {
+  const [name, setName] = useState(customer.name);
+  const [email, setEmail] = useState(customer.email ?? "");
+  const [phone, setPhone] = useState(customer.phone ?? "");
+  const [nationality, setNationality] = useState(customer.nationality ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    onBusyChange(isSubmitting);
+    return () => onBusyChange(false);
+  }, [isSubmitting, onBusyChange]);
+
+  async function submitCustomer(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+
+    if (name.trim().length === 0) {
+      setError("请输入客户姓名。");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await patchJson(`/api/admin/customers/${customer.id}`, {
+        name,
+        email,
+        phone,
+        nationality,
+      });
+      await onSuccess({ message: "客户信息已更新。" });
+    } catch (submitError) {
+      setError(toAdminErrorMessage(submitError, "客户信息保存失败，请稍后重试。"));
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submitCustomer} className="grid gap-4">
+      <InlineError message={error} />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-2">
+          <label className="text-sm font-medium text-slate-700" htmlFor="customerName">
+            姓名
+          </label>
+          <input
+            id="customerName"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            className="rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+          />
+        </div>
+        <div className="grid gap-2">
+          <label className="text-sm font-medium text-slate-700" htmlFor="customerEmail">
+            邮箱
+          </label>
+          <input
+            id="customerEmail"
+            type="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            className="rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+          />
+        </div>
+        <div className="grid gap-2">
+          <label className="text-sm font-medium text-slate-700" htmlFor="customerPhone">
+            电话
+          </label>
+          <input
+            id="customerPhone"
+            value={phone}
+            onChange={(event) => setPhone(event.target.value)}
+            className="rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+          />
+        </div>
+        <div className="grid gap-2">
+          <label className="text-sm font-medium text-slate-700" htmlFor="customerNationality">
+            国籍
+          </label>
+          <input
+            id="customerNationality"
+            value={nationality}
+            onChange={(event) => setNationality(event.target.value)}
+            className="rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+          />
+        </div>
+      </div>
+      <FormActions
+        isSubmitting={isSubmitting}
+        onCancel={onCancel}
+        submitLabel="保存客户信息"
         submittingLabel="保存中..."
       />
     </form>
@@ -985,6 +1398,7 @@ function ImmigrationRequestForm({
         <textarea
           id="immigrationCustomerInstruction"
           name="customerInstruction"
+          placeholder="此说明会显示给客户，请写明需要提交的资料内容和注意事项。"
           className="min-h-20 rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
         />
       </div>
@@ -1114,6 +1528,7 @@ function CustomRequirementForm({
         <textarea
           id="customRequirementInstruction"
           name="customerInstruction"
+          placeholder="此说明会显示给客户，请写明需要提交的资料内容和注意事项。"
           className="min-h-24 rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
         />
       </div>
@@ -1132,7 +1547,15 @@ function CustomRequirementForm({
   );
 }
 
-function ChangeHistoryList({ events }: { events: AdminTimelineEvent[] }) {
+function ChangeHistoryList({
+  events,
+  requirements,
+}: {
+  events: AdminTimelineEvent[];
+  requirements: AdminRequirement[];
+}) {
+  const requirementLookup = useMemo(() => buildRequirementLookup(requirements), [requirements]);
+
   if (events.length === 0) {
     return <p className="text-sm text-slate-500">暂无变更履历。</p>;
   }
@@ -1140,19 +1563,201 @@ function ChangeHistoryList({ events }: { events: AdminTimelineEvent[] }) {
   return (
     <div className="divide-y divide-slate-100">
       {events.map((event) => (
-        <div key={event.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
+        <div key={event.id} className="flex flex-wrap items-start justify-between gap-3 py-2.5">
           <div className="min-w-0">
-            <div className="break-words text-sm font-semibold text-slate-950">
+            <div className="break-words text-sm font-medium text-slate-900">
               {formatChangeHistorySummary(event.summary)}
             </div>
-            <div className="mt-1 text-xs text-slate-500">
-              {displayLabel(event.eventType)} / {displayLabel(event.actorType)}
+            <div className="mt-0.5 break-words text-xs leading-5 text-slate-500">
+              {formatChangeHistoryDetail(event, requirementLookup)}
             </div>
           </div>
-          <div className="shrink-0 text-xs text-slate-500">{formatDateTime(event.createdAt)}</div>
+          <div className="shrink-0 text-xs text-slate-400">{formatDateTime(event.createdAt)}</div>
         </div>
       ))}
     </div>
+  );
+}
+
+function ChangeHistoryModal({
+  events,
+  requirements,
+  onClose,
+  closeDisabled,
+}: {
+  events: AdminTimelineEvent[];
+  requirements: AdminRequirement[];
+  onClose: () => void;
+  closeDisabled?: boolean;
+}) {
+  const [openFilter, setOpenFilter] = useState<"requirements" | "time" | null>(null);
+  const [selectedRequirementIds, setSelectedRequirementIds] = useState<string[]>([]);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const requirementLookup = useMemo(() => buildRequirementLookup(requirements), [requirements]);
+  const hasFilter = selectedRequirementIds.length > 0 || fromDate || toDate;
+
+  const filteredEvents = useMemo(() => {
+    return events.filter((event) => {
+      const eventDate = event.createdAt.slice(0, 10);
+
+      if (fromDate && eventDate < fromDate) {
+        return false;
+      }
+
+      if (toDate && eventDate > toDate) {
+        return false;
+      }
+
+      if (selectedRequirementIds.length === 0) {
+        return true;
+      }
+
+      const requirement = getRequirementFromEvent(event, requirementLookup);
+      return requirement ? selectedRequirementIds.includes(requirement.id) : false;
+    });
+  }, [events, fromDate, requirementLookup, selectedRequirementIds, toDate]);
+
+  function toggleRequirement(requirementId: string) {
+    setSelectedRequirementIds((current) =>
+      current.includes(requirementId)
+        ? current.filter((id) => id !== requirementId)
+        : [...current, requirementId],
+    );
+  }
+
+  function clearFilters() {
+    setSelectedRequirementIds([]);
+    setFromDate("");
+    setToDate("");
+  }
+
+  return (
+    <Modal
+      title={
+        <div className="relative flex flex-wrap items-center gap-2">
+          <span>全部变更履历</span>
+          <div className="relative flex items-center gap-1.5 text-xs font-medium">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setOpenFilter((current) => (current === "requirements" ? null : "requirements"))}
+                className={[
+                  "rounded-full border px-2.5 py-1 transition",
+                  selectedRequirementIds.length > 0 || openFilter === "requirements"
+                    ? "border-blue-200 bg-blue-50 text-blue-700"
+                    : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50",
+                ].join(" ")}
+              >
+                资料名{selectedRequirementIds.length > 0 ? ` ${selectedRequirementIds.length}` : ""}
+                <span className="ml-1 text-[9px] text-slate-400">
+                  {openFilter === "requirements" ? "▲" : "▼"}
+                </span>
+              </button>
+              {openFilter === "requirements" ? (
+                <div className="absolute left-0 top-full z-10 mt-2 w-[min(420px,calc(100vw-3rem))] rounded-2xl border border-slate-200 bg-white p-2.5 shadow-xl shadow-slate-950/10">
+                <div className="mb-1.5 flex items-center justify-between gap-3">
+                  <div className="text-xs font-semibold text-slate-600">资料名</div>
+                  {selectedRequirementIds.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedRequirementIds([])}
+                      className="text-xs font-medium text-blue-700 hover:text-blue-800"
+                    >
+                      清除
+                    </button>
+                  ) : null}
+                </div>
+                <div className="soft-scrollbar max-h-40 overflow-auto pr-1">
+                  {requirements.length === 0 ? (
+                    <p className="px-2 py-1 text-xs text-slate-500">暂无可筛选资料。</p>
+                  ) : (
+                    <div className="grid gap-0.5 sm:grid-cols-2">
+                      {requirements.map((requirement) => (
+                        <label
+                          key={requirement.id}
+                          className="flex min-w-0 items-center gap-1.5 rounded-lg px-1.5 py-1 text-xs text-slate-700 hover:bg-slate-50"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedRequirementIds.includes(requirement.id)}
+                            onChange={() => toggleRequirement(requirement.id)}
+                            className="h-3.5 w-3.5 rounded border-slate-300"
+                          />
+                          <span className="truncate">{displayChineseText(requirement.title)}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              ) : null}
+            </div>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setOpenFilter((current) => (current === "time" ? null : "time"))}
+                className={[
+                  "rounded-full border px-2.5 py-1 transition",
+                  fromDate || toDate || openFilter === "time"
+                    ? "border-blue-200 bg-blue-50 text-blue-700"
+                    : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50",
+                ].join(" ")}
+              >
+                时间
+                <span className="ml-1 text-[9px] text-slate-400">
+                  {openFilter === "time" ? "▲" : "▼"}
+                </span>
+              </button>
+              {openFilter === "time" ? (
+                <div className="absolute left-0 top-full z-10 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-2.5 shadow-xl shadow-slate-950/10">
+                <div className="mb-2 text-xs font-semibold text-slate-600">时间筛选</div>
+                <div className="grid gap-2">
+                  <label className="grid gap-1 text-xs font-medium text-slate-500">
+                    开始日期
+                    <DateTextInput
+                      value={fromDate}
+                      onChange={(event) => setFromDate(event.target.value)}
+                      className="h-10 bg-white text-sm font-normal"
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs font-medium text-slate-500">
+                    结束日期
+                    <DateTextInput
+                      value={toDate}
+                      onChange={(event) => setToDate(event.target.value)}
+                      className="h-10 bg-white text-sm font-normal"
+                    />
+                  </label>
+                </div>
+              </div>
+              ) : null}
+            </div>
+            {hasFilter ? (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="px-1.5 py-1 text-slate-400 hover:text-slate-700"
+              >
+                清除
+              </button>
+            ) : null}
+          </div>
+        </div>
+      }
+      onClose={onClose}
+      closeDisabled={closeDisabled}
+    >
+      <div className="grid h-[min(620px,calc(100vh-10rem))] min-h-[460px] grid-rows-[auto_1fr] gap-4">
+        <div className="flex items-center justify-between text-xs text-slate-500">
+          <span>显示 {filteredEvents.length} / {events.length} 条履历</span>
+        </div>
+
+        <div className="soft-scrollbar overflow-y-auto pr-1">
+          <ChangeHistoryList events={filteredEvents} requirements={requirements} />
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -1177,14 +1782,19 @@ function CasePhaseChangeForm({
   onSuccess: (result: MutationResult) => Promise<void>;
   onBusyChange: (isBusy: boolean) => void;
 }) {
-  const [newPhase, setNewPhase] = useState(currentPhase);
+  const phaseOptions = useMemo(() => getAllowedCasePhaseOptions(currentPhase), [currentPhase]);
+  const defaultNewPhase = phaseOptions[0] ?? "";
+  const [newPhase, setNewPhase] = useState(defaultNewPhase);
   const [reason, setReason] = useState("");
   const [submittedAt, setSubmittedAt] = useState("");
   const [submissionNumber, setSubmissionNumber] = useState("");
   const [resultAt, setResultAt] = useState("");
-  const [allowWithWarnings, setAllowWithWarnings] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    setNewPhase(defaultNewPhase);
+  }, [defaultNewPhase]);
 
   useEffect(() => {
     onBusyChange(isSubmitting);
@@ -1199,6 +1809,16 @@ function CasePhaseChangeForm({
   async function submitPhase(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+
+    if (!newPhase) {
+      setError("当前阶段暂无可切换的下一阶段。");
+      return;
+    }
+
+    if (!phaseOptions.includes(newPhase)) {
+      setError("该阶段不能从当前阶段直接切换。请按案件流程选择允许的下一阶段。");
+      return;
+    }
 
     if (newPhase === currentPhase) {
       setError("请选择一个不同的案件阶段。");
@@ -1224,12 +1844,12 @@ function CasePhaseChangeForm({
           submittedAt,
           submissionNumber,
           resultAt,
-          allowWithWarnings,
+          allowWithWarnings: false,
         },
       );
       const warningMessage =
         result.warnings.length > 0
-          ? `Warning：${result.warnings.map(formatPhaseWarning).join(" / ")}`
+          ? `提示：${result.warnings.map(formatPhaseWarning).join(" / ")}`
           : undefined;
 
       await onSuccess({
@@ -1237,7 +1857,7 @@ function CasePhaseChangeForm({
         warningMessage,
       });
     } catch (submitError) {
-      setError(toAdminErrorMessage(submitError, "案件阶段切换失败。请检查阶段和原因后重试。"));
+      setError(formatCasePhaseSubmitError(submitError));
     } finally {
       setIsSubmitting(false);
     }
@@ -1246,9 +1866,6 @@ function CasePhaseChangeForm({
   return (
     <form onSubmit={submitPhase} className="grid gap-4">
       <InlineError message={error} />
-      <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">
-        案件阶段和资料审核状态是分开的。切换案件阶段不会自动审核资料，也不会自动创建入管追加材料。
-      </div>
       <div className="grid gap-2">
         <label className="text-sm font-medium text-slate-700" htmlFor="newPhase">
           新案件阶段
@@ -1257,14 +1874,25 @@ function CasePhaseChangeForm({
           id="newPhase"
           value={newPhase}
           onChange={(event) => setNewPhase(event.target.value)}
+          disabled={phaseOptions.length === 0}
           className="rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
         >
-          {casePhaseSteps.map((phase) => (
+          <option value="" disabled>
+            请选择案件阶段
+          </option>
+          {phaseOptions.map((phase) => (
             <option key={phase} value={phase}>
               {displayLabel(phase)}
             </option>
           ))}
         </select>
+        {phaseOptions.length > 0 ? (
+          <p className="text-xs text-slate-500">
+            当前阶段可切换到：{phaseOptions.map(displayLabel).join("、")}
+          </p>
+        ) : (
+          <p className="text-xs text-slate-500">当前阶段没有可继续切换的下一阶段。</p>
+        )}
         {needsConfirmation ? (
           <p className="text-xs text-amber-700">该阶段切换提交前会要求确认，建议填写原因。</p>
         ) : null}
@@ -1320,15 +1948,6 @@ function CasePhaseChangeForm({
           />
         </div>
       ) : null}
-      <label className="flex items-center gap-2 text-sm text-slate-600">
-        <input
-          type="checkbox"
-          checked={allowWithWarnings}
-          onChange={(event) => setAllowWithWarnings(event.target.checked)}
-          className="h-4 w-4 rounded border-slate-300"
-        />
-        允许带 warning 继续切换
-      </label>
       <FormActions
         isSubmitting={isSubmitting}
         onCancel={onCancel}
@@ -1534,7 +2153,7 @@ function TokenRegenerateForm({
 
     if (
       !confirmImportantAction(
-        "旧的有效客户访问链接会失效。新的明文访问令牌只会显示一次，请准备好立即复制。",
+        "旧的有效客户访问链接会失效。新的客户访问链接只会显示一次，请准备好立即复制。",
       )
     ) {
       return;
@@ -1551,7 +2170,7 @@ function TokenRegenerateForm({
       );
 
       setRegeneratedToken(result);
-      await onSuccess({ message: "客户访问链接已重新生成。请立即复制新的访问令牌。" });
+      await onSuccess({ message: "客户访问链接已重新生成。请立即复制新的客户链接。" });
     } catch (submitError) {
       setError(toAdminErrorMessage(submitError, "客户访问链接重新生成失败。请稍后重试。"));
     } finally {
@@ -1559,16 +2178,16 @@ function TokenRegenerateForm({
     }
   }
 
-  async function copyToken() {
+  async function copyPortalLink() {
     if (!regeneratedToken) {
       return;
     }
 
     try {
-      await navigator.clipboard.writeText(regeneratedToken.plaintextToken);
+      await navigator.clipboard.writeText(createPortalAccessUrl(regeneratedToken.plaintextToken));
       setCopyMessage("已复制到剪贴板。");
     } catch {
-      setCopyMessage("复制失败，请手动选择访问令牌。");
+      setCopyMessage("复制失败，请手动选择访问链接。");
     }
   }
 
@@ -1576,7 +2195,7 @@ function TokenRegenerateForm({
     <form onSubmit={submitRegenerate} className="grid gap-4">
       <InlineError message={error} />
       <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">
-        重新生成会让旧的客户访问链接失效。新的访问令牌只在本窗口显示一次，关闭后无法再次查看。
+        重新生成会让旧的客户访问链接失效。新的客户链接只在本窗口显示一次，关闭后无法再次查看。
       </div>
       <div className="grid gap-2">
         <label className="text-sm font-medium text-slate-700" htmlFor="tokenRegenerateReason">
@@ -1604,13 +2223,13 @@ function TokenRegenerateForm({
       </div>
 
       {regeneratedToken ? (
-        <div className="grid gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 shadow-sm">
-          <div>
-            <div className="text-base font-semibold">明文访问令牌只显示一次。</div>
+          <div className="grid gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 shadow-sm">
+            <div>
+            <div className="text-base font-semibold">客户访问链接只显示一次。</div>
             <div className="mt-1 text-amber-800">请现在复制并交给客户，关闭弹窗后无法再次查看。</div>
           </div>
           <div className="break-all rounded-xl border border-amber-300 bg-white p-3 font-mono text-xs text-slate-900 shadow-inner">
-            {regeneratedToken.plaintextToken}
+            {createPortalAccessUrl(regeneratedToken.plaintextToken)}
           </div>
           <div className="grid gap-1 text-xs text-amber-800">
             <div>新访问令牌 ID：{regeneratedToken.newTokenId}</div>
@@ -1620,10 +2239,10 @@ function TokenRegenerateForm({
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
-              onClick={copyToken}
+              onClick={copyPortalLink}
               className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
             >
-              复制访问令牌
+              复制客户链接
             </button>
             {copyMessage ? <span className="text-sm text-amber-800">{copyMessage}</span> : null}
           </div>
@@ -1720,6 +2339,7 @@ function TokenRevokeForm({
 }
 
 export function AdminCaseDetailPage({ caseId }: Props) {
+  const router = useRouter();
   const [caseDetail, setCaseDetail] = useState<AdminCaseDetail | null>(null);
   const [requirements, setRequirements] = useState<AdminRequirement[]>([]);
   const [timeline, setTimeline] = useState<AdminTimelineEvent[]>([]);
@@ -1732,8 +2352,10 @@ export function AdminCaseDetailPage({ caseId }: Props) {
     useState<FileDeleteConfirmation | null>(null);
   const [requirementDeleteConfirmation, setRequirementDeleteConfirmation] =
     useState<RequirementDeleteConfirmation | null>(null);
+  const [caseDeleteConfirmation, setCaseDeleteConfirmation] = useState(false);
   const [fileDeleteError, setFileDeleteError] = useState<string | null>(null);
   const [requirementDeleteError, setRequirementDeleteError] = useState<string | null>(null);
+  const [caseDeleteError, setCaseDeleteError] = useState<string | null>(null);
   const [downloadingRequirementId, setDownloadingRequirementId] = useState<string | null>(null);
   const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
   const [deletingRequirementId, setDeletingRequirementId] = useState<string | null>(null);
@@ -1743,6 +2365,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [isModalBusy, setIsModalBusy] = useState(false);
   const [isImmigrationExpanded, setIsImmigrationExpanded] = useState(true);
+  const [isDeletingCase, setIsDeletingCase] = useState(false);
 
   const loadCase = useCallback(async () => {
     setIsLoading(true);
@@ -1844,6 +2467,21 @@ export function AdminCaseDetailPage({ caseId }: Props) {
     setDownloadingRequirementId(requirement.id);
 
     try {
+      if (uploadedFiles.length === 1) {
+        const file = uploadedFiles[0];
+        const result = await postJson<AdminFileSignedUrlResult>(
+          `/api/admin/files/${file.id}/signed-url`,
+          {},
+        );
+
+        triggerFileDownload({
+          fileUrl: result.signedUrl,
+          fileName: file.originalFileName,
+        });
+        setMessage("文件下载已开始。");
+        return;
+      }
+
       const archive = await postBlob(
         `/api/admin/requirements/${requirement.id}/files/archive`,
       );
@@ -1988,6 +2626,35 @@ export function AdminCaseDetailPage({ caseId }: Props) {
     setRequirementDeleteError(null);
   }
 
+  function requestDeleteCase() {
+    setCaseDeleteError(null);
+    setCaseDeleteConfirmation(true);
+  }
+
+  async function confirmCaseDelete() {
+    setCaseDeleteError(null);
+    setIsDeletingCase(true);
+
+    try {
+      await deleteJson<RemovedAdminCaseResult>(`/api/admin/cases/${caseId}`);
+      router.push("/admin/cases");
+      router.refresh();
+    } catch (deleteError) {
+      setCaseDeleteError(toAdminErrorMessage(deleteError, "案件删除失败，请稍后重试。"));
+    } finally {
+      setIsDeletingCase(false);
+    }
+  }
+
+  function closeCaseDeleteConfirmation() {
+    if (isDeletingCase) {
+      return;
+    }
+
+    setCaseDeleteConfirmation(false);
+    setCaseDeleteError(null);
+  }
+
   function closeFilePreview() {
     setFilePreview(null);
   }
@@ -2028,6 +2695,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
     }),
     [requirements],
   );
+  const latestCasePhaseReason = useMemo(() => getLatestCasePhaseReason(timeline), [timeline]);
 
   return (
     <main className="w-full">
@@ -2038,6 +2706,15 @@ export function AdminCaseDetailPage({ caseId }: Props) {
           </Link>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">案件详情</h1>
         </div>
+        {caseDetail ? (
+          <button
+            type="button"
+            onClick={requestDeleteCase}
+            className="inline-flex w-fit rounded-2xl border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50"
+          >
+            删除案件
+          </button>
+        ) : null}
       </div>
 
       {isLoading ? <LoadingState title="案件详情加载中" detail="正在读取案件、资料项和变更履历。" /> : null}
@@ -2068,7 +2745,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
               <div>
                 <h2 className="break-words text-2xl font-semibold text-slate-950">{caseDetail.caseNumber}</h2>
                 <p className="mt-1 text-sm text-slate-600">
-                  {displayVisaType(caseDetail.currentVisaType)} 申请 {displayVisaType(caseDetail.targetVisaType)}
+                  {formatVisaBusinessSummary(caseDetail.currentVisaType, caseDetail.targetVisaType)}
                 </p>
               </div>
               <StatusBadge value={caseDetail.casePhase} />
@@ -2076,7 +2753,18 @@ export function AdminCaseDetailPage({ caseId }: Props) {
           </DashboardCard>
 
           <DashboardCard>
-            <SectionHeader title="客户信息" />
+            <SectionHeader
+              title="客户信息"
+              action={
+                <button
+                  type="button"
+                  onClick={() => setActiveModal({ type: "customer", customer: caseDetail.customer })}
+                  className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                >
+                  编辑
+                </button>
+              }
+            />
             <div className="grid gap-x-10 gap-y-5 text-sm sm:grid-cols-2 xl:grid-cols-4">
               <div>
                 <div className="text-slate-500">姓名</div>
@@ -2135,6 +2823,14 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                   </div>
                 </div>
                 <ProgressStepper steps={casePhaseSteps} currentStep={caseDetail.casePhase} />
+                {latestCasePhaseReason ? (
+                  <div className="mt-5 border-t border-slate-100 pt-4">
+                    <div className="text-sm text-slate-500">备注</div>
+                    <div className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">
+                      {latestCasePhaseReason}
+                    </div>
+                  </div>
+                ) : null}
               </DashboardCard>
 
               <div className="grid gap-6">
@@ -2216,15 +2912,10 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                     >
                       添加材料
                     </button>
-                    <button
-                      type="button"
+                    <CollapseIconButton
+                      isExpanded={isImmigrationExpanded}
                       onClick={() => setIsImmigrationExpanded((current) => !current)}
-                      aria-label={isImmigrationExpanded ? "隐藏内容" : "展开内容"}
-                      title={isImmigrationExpanded ? "隐藏内容" : "展开内容"}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-lg font-semibold leading-none text-slate-500 outline-none hover:bg-slate-50 hover:text-blue-700 focus-visible:ring-2 focus-visible:ring-blue-100"
-                    >
-                      {isImmigrationExpanded ? "∧" : "∨"}
-                    </button>
+                    />
                   </div>
                 </div>
                 {isImmigrationExpanded ? <div className="grid gap-6">
@@ -2310,7 +3001,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
 
           </div>
 
-          <DashboardCard>
+          <DashboardCard className="shadow-sm">
             <SectionHeader
               title="变更履历"
               action={
@@ -2325,14 +3016,33 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                 ) : null
               }
             />
-            <ChangeHistoryList events={timeline.slice(0, 3)} />
+            <ChangeHistoryList events={timeline.slice(0, 3)} requirements={requirements} />
           </DashboardCard>
         </div>
       ) : null}
 
+      {activeModal?.type === "customer" ? (
+        <Modal
+          title="编辑客户信息"
+          onClose={closeActiveModal}
+          closeDisabled={isModalBusy}
+        >
+          <CustomerEditForm
+            customer={activeModal.customer}
+            onCancel={closeActiveModal}
+            onSuccess={handleMutationSuccess}
+            onBusyChange={setIsModalBusy}
+          />
+        </Modal>
+      ) : null}
+
       {activeModal?.type === "review" ? (
         <Modal
-          title="审核资料状态"
+          title={
+            activeModal.requirement.responsibleParty === "office"
+              ? "事务所资料制作状态"
+              : "审核资料状态"
+          }
           onClose={closeActiveModal}
           closeDisabled={isModalBusy}
         >
@@ -2365,7 +3075,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
 
       {activeModal?.type === "note" ? (
         <Modal
-          title={activeModal.requirement.internalNote ? "修改备注" : "添加备注"}
+          title={getVisibleRequirementInternalNote(activeModal.requirement) ? "修改备注" : "添加备注"}
           onClose={closeActiveModal}
           closeDisabled={isModalBusy}
         >
@@ -2451,7 +3161,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
       {activeModal?.type === "tokenRegenerate" ? (
         <Modal
           title="重新生成客户访问链接"
-          description="旧的有效访问令牌会失效，新的明文访问令牌只显示一次。"
+          description="旧链接会失效，新的客户访问链接只显示一次。"
           onClose={closeActiveModal}
           closeDisabled={isModalBusy}
         >
@@ -2481,13 +3191,12 @@ export function AdminCaseDetailPage({ caseId }: Props) {
       ) : null}
 
       {activeModal?.type === "changeHistory" ? (
-        <Modal
-          title="全部变更履历"
+        <ChangeHistoryModal
+          events={timeline}
+          requirements={requirements}
           onClose={closeActiveModal}
           closeDisabled={isModalBusy}
-        >
-          <ChangeHistoryList events={timeline} />
-        </Modal>
+        />
       ) : null}
 
       {fileDeleteConfirmation ? (
@@ -2574,6 +3283,42 @@ export function AdminCaseDetailPage({ caseId }: Props) {
               >
                 {deletingRequirementRecordId ? <SubmitSpinner /> : null}
                 {deletingRequirementRecordId ? "删除中..." : "确认删除"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
+
+      {caseDeleteConfirmation && caseDetail ? (
+        <Modal
+          title="确认删除案件"
+          description={caseDetail.caseNumber}
+          onClose={closeCaseDeleteConfirmation}
+          closeDisabled={isDeletingCase}
+        >
+          <div className="grid gap-4">
+            <InlineError message={caseDeleteError} />
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-900">
+              确定删除该案件吗？删除后，案件、资料项、上传文件记录、客户访问链接、变更履历和通知记录都会被移除。
+              客户资料本身不会删除。此操作无法撤销。
+            </div>
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                disabled={isDeletingCase}
+                onClick={closeCaseDeleteConfirmation}
+                className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 sm:w-auto"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingCase}
+                onClick={() => void confirmCaseDelete()}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto"
+              >
+                {isDeletingCase ? <SubmitSpinner /> : null}
+                {isDeletingCase ? "删除中..." : "确认删除案件"}
               </button>
             </div>
           </div>

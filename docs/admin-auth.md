@@ -260,15 +260,12 @@ Logs must not contain:
 
 ## 9. Production Blockers
 
-The following block production readiness:
+Current production blockers:
 
-- placeholder `requireAdminAuth`
-- no real Admin session system
-- no CSRF guard
-- no rate limit
-- no Admin auth audit
-- no secure cookie/session deployment validation
-- no deployment strategy for preview/staging/production separation
+- production OAuth callback / secure cookie runtime verification is not complete.
+- production Upstash-backed rate limit smoke verification is required.
+- production deployment and rollback runbook still needs final confirmation.
+- preview/staging/production database and storage isolation must be verified before public deployment.
 
 ## 10. Testing Strategy
 
@@ -340,19 +337,22 @@ Middleware remains UX-only:
 - it does not validate the database session.
 - `/api/admin/*` routes must continue calling `requireAdminAuth`.
 
-Still not implemented:
+Implemented after this phase:
 
 - CSRF protection for Admin mutations.
-- rate limiting.
+- route-level rate limiting with memory and Upstash backends.
+- Auth audit writes for login/logout, CSRF failures, and rate-limit events.
+
+Still required before production:
+
 - full production deployment validation.
-- OAuth provider production configuration verification.
+- OAuth provider production callback verification.
 
-Production blockers after Phase 8-3C:
+Production blockers after later auth hardening phases:
 
-- no CSRF guard.
-- no rate limit.
-- no secure cookie / callback URL production smoke test.
-- no formal staging-to-production auth rollout runbook.
+- secure cookie / callback URL production smoke test.
+- Upstash-backed staging/production rate-limit smoke test.
+- formal staging-to-production auth rollout runbook.
 
 ## 13. Phase 8-4B CSRF Implementation Status
 

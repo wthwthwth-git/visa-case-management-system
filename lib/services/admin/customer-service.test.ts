@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   findMany: vi.fn(),
   count: vi.fn(),
+  findUnique: vi.fn(),
+  update: vi.fn(),
 }));
 
 vi.mock("@/lib/prisma", () => ({
@@ -10,11 +12,18 @@ vi.mock("@/lib/prisma", () => ({
     customer: {
       findMany: mocks.findMany,
       count: mocks.count,
+      findUnique: mocks.findUnique,
+      update: mocks.update,
     },
   },
 }));
 
-import { listAdminCustomers } from "./customer-service";
+import {
+  AdminCustomerAccessError,
+  InvalidAdminCustomerInputError,
+  listAdminCustomers,
+  updateAdminCustomer,
+} from "./customer-service";
 
 const updatedAt = new Date("2026-01-01T00:00:00.000Z");
 const birthday = new Date("1990-01-01T00:00:00.000Z");
@@ -49,6 +58,16 @@ describe("admin customer service", () => {
       },
     ]);
     mocks.count.mockResolvedValue(2);
+    mocks.findUnique.mockResolvedValue({ id: "customer-id" });
+    mocks.update.mockResolvedValue({
+      id: "customer-id",
+      name: "Updated Customer",
+      email: "updated@example.com",
+      phone: "090-0000-0000",
+      nationality: "Japan",
+      birthday,
+      updatedAt,
+    });
   });
 
   it("lists customers with default pagination and DTO mapping", async () => {
@@ -158,5 +177,94 @@ describe("admin customer service", () => {
     expect(payload).not.toContain("storageBucket");
     expect(payload).not.toContain("signedUrl");
     expect(payload).not.toContain("_count");
+  });
+
+  it("updates customer visible admin fields and returns a safe DTO", async () => {
+    const result = await updateAdminCustomer({
+      customerId: " customer-id ",
+      name: " Updated Customer ",
+      email: " updated@example.com ",
+      phone: " 090-0000-0000 ",
+      nationality: " Japan ",
+    });
+
+    expect(mocks.findUnique).toHaveBeenCalledWith({
+      where: { id: "customer-id" },
+      select: { id: true },
+    });
+    expect(mocks.update).toHaveBeenCalledWith({
+      where: { id: "customer-id" },
+      data: {
+        name: "Updated Customer",
+        email: "updated@example.com",
+        phone: "090-0000-0000",
+        nationality: "Japan",
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        nationality: true,
+        birthday: true,
+        updatedAt: true,
+      },
+    });
+    expect(result).toEqual({
+      id: "customer-id",
+      name: "Updated Customer",
+      email: "updated@example.com",
+      phone: "090-0000-0000",
+      nationality: "Japan",
+      birthday: "1990-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+    expect(JSON.stringify(result)).not.toContain("passportNumber");
+    expect(JSON.stringify(result)).not.toContain("residenceCardNumber");
+    expect(JSON.stringify(result)).not.toContain("address");
+  });
+
+  it("stores blank optional customer fields as null", async () => {
+    await updateAdminCustomer({
+      customerId: "customer-id",
+      name: "Updated Customer",
+      email: " ",
+      phone: "",
+      nationality: undefined,
+    });
+
+    expect(mocks.update.mock.calls[0][0].data).toMatchObject({
+      email: null,
+      phone: null,
+      nationality: null,
+    });
+  });
+
+  it("rejects missing customer update fields", async () => {
+    await expect(
+      updateAdminCustomer({
+        customerId: "customer-id",
+        name: " ",
+      }),
+    ).rejects.toBeInstanceOf(InvalidAdminCustomerInputError);
+
+    await expect(
+      updateAdminCustomer({
+        customerId: "",
+        name: "Updated Customer",
+      }),
+    ).rejects.toBeInstanceOf(InvalidAdminCustomerInputError);
+  });
+
+  it("fails when customer does not exist", async () => {
+    mocks.findUnique.mockResolvedValue(null);
+
+    await expect(
+      updateAdminCustomer({
+        customerId: "missing-customer-id",
+        name: "Updated Customer",
+      }),
+    ).rejects.toBeInstanceOf(AdminCustomerAccessError);
+    expect(mocks.update).not.toHaveBeenCalled();
   });
 });

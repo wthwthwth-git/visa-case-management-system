@@ -7,6 +7,9 @@ const mocks = vi.hoisted(() => {
       findUnique: vi.fn(),
       update: vi.fn(),
     },
+    documentFile: {
+      updateMany: vi.fn(),
+    },
     timelineEvent: {
       create: vi.fn(),
     },
@@ -61,6 +64,7 @@ describe("requirement review service", () => {
       updatedAt,
     }));
     mocks.tx.timelineEvent.create.mockImplementation(async ({ data }) => data);
+    mocks.tx.documentFile.updateMany.mockResolvedValue({ count: 0 });
   });
 
   it("reviews submitted to approved without changing the case phase", async () => {
@@ -154,7 +158,7 @@ describe("requirement review service", () => {
     expect(mocks.tx.timelineEvent.create).not.toHaveBeenCalled();
   });
 
-  it("allows office requirements to move to needs_more without customer instruction", async () => {
+  it("limits office requirements to in-progress or completed states and exposes completed files", async () => {
     mocks.tx.caseDocumentRequirement.findUnique.mockResolvedValue(
       createRequirement({ responsibleParty: "office" }),
     );
@@ -162,14 +166,40 @@ describe("requirement review service", () => {
     const result = await reviewCaseDocumentRequirement({
       caseId,
       requirementId,
-      newStatus: "needs_more",
+      newStatus: "approved",
     });
     const updateArg = mocks.tx.caseDocumentRequirement.update.mock.calls[0][0];
 
-    expect(result.status).toBe("needs_more");
+    expect(result.status).toBe("approved");
     expect(updateArg.data).toEqual({
-      status: "needs_more",
+      status: "approved",
+      portalVisible: true,
+      portalDownloadable: true,
     });
+    expect(mocks.tx.documentFile.updateMany).toHaveBeenCalledWith({
+      where: {
+        requirementId,
+        status: "uploaded",
+      },
+      data: {
+        portalVisible: true,
+        portalDownloadable: true,
+      },
+    });
+  });
+
+  it("rejects office requirement customer-review-only statuses", async () => {
+    mocks.tx.caseDocumentRequirement.findUnique.mockResolvedValue(
+      createRequirement({ responsibleParty: "office" }),
+    );
+
+    await expect(
+      reviewCaseDocumentRequirement({
+        caseId,
+        requirementId,
+        newStatus: "needs_more",
+      }),
+    ).rejects.toBeInstanceOf(InvalidRequirementStatusTransitionError);
   });
 
   it("does not put internalNote or customerInstruction into timeline metadata", async () => {

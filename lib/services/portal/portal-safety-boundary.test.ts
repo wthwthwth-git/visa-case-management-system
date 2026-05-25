@@ -31,7 +31,6 @@ const bannedValues = [
   "plaintext-token-value",
   "passport-number-value",
   "residence-card-number-value",
-  "passport.pdf",
   "metadata-value",
   "internal-operator-value",
   "https://signed.example.test/file",
@@ -73,6 +72,7 @@ describe("portal service safety boundary", () => {
           customerInstruction: "Upload a copy.",
           internalNote: "do-not-leak-internal-note",
           isRequired: true,
+          responsibleParty: "customer",
           status: "approved",
           sourceType: "template",
           portalDownloadable: true,
@@ -84,6 +84,8 @@ describe("portal service safety boundary", () => {
               mimeType: "application/pdf",
               fileSize: "1234",
               createdAt: new Date("2026-01-01T00:00:00.000Z"),
+              uploadedByType: "internal",
+              portalVisible: true,
               portalDownloadable: true,
               storagePath: "cases/case-safe/requirements/requirement-safe/file.pdf",
               storageBucket: "case-files",
@@ -107,7 +109,7 @@ describe("portal service safety boundary", () => {
       ],
     };
     const dto = portalServices.toPortalCaseDTO(
-      unsafeSource as Parameters<typeof portalServices.toPortalCaseDTO>[0],
+      unsafeSource as unknown as Parameters<typeof portalServices.toPortalCaseDTO>[0],
     );
 
     expectNoBannedPortalFields(JSON.stringify(dto));
@@ -116,6 +118,7 @@ describe("portal service safety boundary", () => {
   it("keeps Portal upload and confirmation DTO shapes free of banned fields", () => {
     const uploadResult: PortalFileDTO = {
       id: "file-safe",
+      displayName: "passport.pdf",
       mimeType: "application/pdf",
       fileSize: "1234",
       createdAt: "2026-01-01T00:00:00.000Z",

@@ -1,5 +1,6 @@
 export * from "./application-confirmation-service";
 export * from "./case-create-service";
+export * from "./case-delete-service";
 export * from "./case-phase-service";
 export * from "./case-service";
 export * from "./customer-service";
@@ -9,6 +10,7 @@ export * from "./file-signed-url-service";
 export * from "./file-archive-service";
 export * from "./file-delete-service";
 export * from "./immigration-requirement-service";
+export * from "./notification-service";
 export * from "./portal-token-service";
 export * from "./requirement-review-service";
 export * from "./requirement-note-service";

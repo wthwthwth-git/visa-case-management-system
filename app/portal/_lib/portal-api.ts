@@ -9,6 +9,7 @@ export type PortalDocumentStatus =
 
 export type PortalFile = {
   id: string;
+  displayName: string;
   mimeType: string;
   fileSize: string;
   createdAt: string;
@@ -20,9 +21,22 @@ export type PortalRequirement = {
   title: string;
   customerInstruction: string | null;
   isRequired: boolean;
+  responsibleParty: "customer" | "office";
   clientStatus: PortalDocumentStatus;
   sourceType: string;
   files: PortalFile[];
+};
+
+export type PortalRequirementSubmission = {
+  requirementId: string;
+  clientStatus: PortalDocumentStatus;
+  submittedFileCount: number;
+};
+
+export type PortalRemovedFile = {
+  fileId: string;
+  requirementId: string;
+  status: "removed";
 };
 
 export type PortalApplicationConfirmation = {
@@ -115,6 +129,92 @@ export async function uploadPortalRequirementFile(input: {
   );
 
   return parsePortalResponse<PortalFile>(response);
+}
+
+export async function submitPortalRequirement(input: {
+  token: string;
+  requirementId: string;
+}): Promise<PortalRequirementSubmission> {
+  const response = await fetch(
+    portalPath(input.token, `/requirements/${encodeURIComponent(input.requirementId)}/submit`),
+    {
+      method: "POST",
+    },
+  );
+
+  return parsePortalResponse<PortalRequirementSubmission>(response);
+}
+
+export async function withdrawPortalRequirement(input: {
+  token: string;
+  requirementId: string;
+}): Promise<PortalRequirementSubmission> {
+  const response = await fetch(
+    portalPath(input.token, `/requirements/${encodeURIComponent(input.requirementId)}/withdraw`),
+    {
+      method: "POST",
+    },
+  );
+
+  return parsePortalResponse<PortalRequirementSubmission>(response);
+}
+
+export async function confirmPortalOfficeRequirement(input: {
+  token: string;
+  requirementId: string;
+}): Promise<PortalRequirementSubmission> {
+  const response = await fetch(
+    portalPath(input.token, `/requirements/${encodeURIComponent(input.requirementId)}/confirm`),
+    {
+      method: "POST",
+    },
+  );
+
+  return parsePortalResponse<PortalRequirementSubmission>(response);
+}
+
+export async function requestPortalOfficeRequirementRevision(input: {
+  token: string;
+  requirementId: string;
+  comment?: string;
+}): Promise<PortalRequirementSubmission> {
+  const response = await fetch(
+    portalPath(
+      input.token,
+      `/requirements/${encodeURIComponent(input.requirementId)}/request-revision`,
+    ),
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        comment: cleanOptionalString(input.comment),
+      }),
+    },
+  );
+
+  return parsePortalResponse<PortalRequirementSubmission>(response);
+}
+
+export async function deletePortalRequirementFile(input: {
+  token: string;
+  requirementId: string;
+  fileId: string;
+}): Promise<PortalRemovedFile> {
+  const response = await fetch(
+    portalPath(
+      input.token,
+      `/requirements/${encodeURIComponent(input.requirementId)}/files/${encodeURIComponent(
+        input.fileId,
+      )}`,
+    ),
+    {
+      method: "DELETE",
+    },
+  );
+
+  return parsePortalResponse<PortalRemovedFile>(response);
 }
 
 async function requestImmediateAccessUrl(path: string): Promise<ImmediateAccessUrl> {
@@ -217,7 +317,7 @@ export function toPortalErrorMessage(error: unknown): string {
     case "FILE_NOT_ACCESSIBLE":
       return "文件暂时无法访问，请联系事务所。";
     case "CONFIRMATION_NOT_ACCESSIBLE":
-      return "申请书暂时无法访问，请联系事务所。";
+      return "完成资料暂时无法访问，请联系事务所。";
     case "INVALID_UPLOAD":
       if (
         apiMessage &&

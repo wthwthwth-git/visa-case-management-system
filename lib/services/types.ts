@@ -2,6 +2,7 @@ import type {
   ApplicationConfirmationStatus,
   CasePhase,
   Prisma,
+  ResponsibleParty,
   RequirementSourceType,
   RequirementStatus,
   TimelineEventType,
@@ -18,10 +19,23 @@ export type PortalDocumentStatus =
 
 export type PortalFileDTO = {
   id: string;
+  displayName: string;
   mimeType: string;
   fileSize: string;
   createdAt: string;
   portalDownloadable: boolean;
+};
+
+export type PortalRequirementSubmissionDTO = {
+  requirementId: string;
+  clientStatus: PortalDocumentStatus;
+  submittedFileCount: number;
+};
+
+export type PortalRemovedFileDTO = {
+  fileId: string;
+  requirementId: string;
+  status: "removed";
 };
 
 export type PortalRequirementDTO = {
@@ -29,6 +43,7 @@ export type PortalRequirementDTO = {
   title: string;
   customerInstruction: string | null;
   isRequired: boolean;
+  responsibleParty: ResponsibleParty;
   clientStatus: PortalDocumentStatus;
   sourceType: RequirementSourceType;
   files: PortalFileDTO[];

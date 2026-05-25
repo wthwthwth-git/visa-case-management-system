@@ -7,20 +7,23 @@ export function cx(...classes: Array<string | false | null | undefined>) {
 }
 
 const statusLabels: Record<string, string> = {
-  not_submitted: "\u5f85\u4e0a\u4f20",
-  needs_more: "\u9700\u8981\u8865\u5145",
-  submitted: "\u5df2\u63d0\u4ea4",
-  accepted: "\u5df2\u53d7\u7406",
-  not_applicable: "\u4e0d\u9002\u7528",
-  pending: "\u5f85\u786e\u8ba4",
-  confirmed: "\u5df2\u786e\u8ba4",
-  needs_revision: "\u8981\u6c42\u4fee\u6539",
-  superseded: "\u5df2\u4f5c\u5e9f",
-  draft: "\u8349\u7a3f",
-  collecting_documents: "\u8d44\u6599\u6536\u96c6\u4e2d",
-  preparing_application: "\u7533\u8bf7\u4e66\u5236\u4f5c\u4e2d",
-  under_review: "\u5ba1\u67e5\u4e2d",
-  approved: "\u5ba1\u67e5\u5b8c\u4e86",
+  not_submitted: "未提交",
+  needs_more: "需补充",
+  submitted: "已提交",
+  accepted: "已确认",
+  office_in_progress: "制作中",
+  office_completed: "已完成",
+  office_confirmed: "已确认",
+  not_applicable: "需修改",
+  pending: "待确认",
+  confirmed: "已确认",
+  needs_revision: "需修改",
+  superseded: "已作废",
+  draft: "草稿",
+  collecting_documents: "材料收集中",
+  preparing_application: "资料做成中",
+  under_review: "审查中",
+  approved: "审查完了",
 };
 
 export function displayPortalLabel(value: string): string {
@@ -28,11 +31,17 @@ export function displayPortalLabel(value: string): string {
 }
 
 function statusTone(value: string): string {
-  if (value === "accepted" || value === "confirmed" || value === "approved") {
+  if (
+    value === "accepted" ||
+    value === "confirmed" ||
+    value === "approved" ||
+    value === "office_completed" ||
+    value === "office_confirmed"
+  ) {
     return "border-emerald-200 bg-emerald-50 text-emerald-700";
   }
 
-  if (value === "needs_more" || value === "needs_revision") {
+  if (value === "needs_more" || value === "not_applicable" || value === "needs_revision") {
     return "border-amber-200 bg-amber-50 text-amber-800";
   }
 
@@ -40,7 +49,7 @@ function statusTone(value: string): string {
     return "border-rose-200 bg-rose-50 text-rose-700";
   }
 
-  if (value === "submitted" || value === "under_review") {
+  if (value === "submitted" || value === "under_review" || value === "office_in_progress") {
     return "border-blue-200 bg-blue-50 text-blue-700";
   }
 
@@ -98,7 +107,7 @@ export function PortalButton({
         variant === "secondary"
           ? "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
           : null,
-        variant === "danger" ? "bg-amber-600 text-white hover:bg-amber-700" : null,
+        variant === "danger" ? "bg-rose-600 text-white hover:bg-rose-700" : null,
         className,
       )}
       {...props}
@@ -144,14 +153,14 @@ export function EmptyState({ title, description }: { title: string; description:
 export function groupTitle(status: PortalDocumentStatus) {
   switch (status) {
     case "not_submitted":
-      return "\u5f85\u4e0a\u4f20";
+      return "待提交";
     case "needs_more":
-      return "\u9700\u8981\u8865\u5145";
-    case "submitted":
-      return "\u5df2\u63d0\u4ea4";
-    case "accepted":
-      return "\u5df2\u53d7\u7406 / \u5df2\u5b8c\u6210";
+      return "需补充";
     case "not_applicable":
-      return "\u4e0d\u9002\u7528";
+      return "需修改";
+    case "submitted":
+      return "已提交";
+    case "accepted":
+      return "已确认";
   }
 }

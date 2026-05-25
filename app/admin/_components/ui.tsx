@@ -1,4 +1,4 @@
-import type { InputHTMLAttributes, ReactNode } from "react";
+import { useEffect, useRef, useState, type InputHTMLAttributes, type ReactNode } from "react";
 import { displayChineseText } from "@/app/_lib/chinese-display";
 import { formatDateTime, type AdminTimelineEvent } from "../_lib/admin-api";
 
@@ -30,6 +30,9 @@ const labelMap: Record<string, string> = {
   customer: "客户",
   custom: "自定义",
   office: "事务所",
+  office_completed: "已完成",
+  office_confirmed: "已确认",
+  office_in_progress: "制作中",
   immigration_request: "入管追加材料",
   internal: "内部",
   system: "系统",
@@ -171,6 +174,8 @@ function statusTone(value: string): string {
     normalized.includes("accepted") ||
     normalized.includes("active") ||
     normalized.includes("confirmed") ||
+    normalized.includes("office_completed") ||
+    normalized.includes("office_confirmed") ||
     normalized.includes("result_completed")
   ) {
     return "border-emerald-200 bg-emerald-50 text-emerald-700";
@@ -356,18 +361,47 @@ export function Modal({
   onClose,
   closeDisabled,
 }: {
-  title: string;
+  title: ReactNode;
   description?: string;
   children: ReactNode;
   onClose: () => void;
   closeDisabled?: boolean;
 }) {
+  const [isScrolling, setIsScrolling] = useState(false);
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (scrollTimerRef.current) {
+        clearTimeout(scrollTimerRef.current);
+      }
+    };
+  }, []);
+
+  function handleScroll() {
+    setIsScrolling(true);
+
+    if (scrollTimerRef.current) {
+      clearTimeout(scrollTimerRef.current);
+    }
+
+    scrollTimerRef.current = setTimeout(() => {
+      setIsScrolling(false);
+    }, 700);
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 p-2 sm:items-center sm:p-4">
-      <div className="max-h-[calc(100vh-1rem)] w-full max-w-2xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl shadow-slate-950/20 sm:max-h-[calc(100vh-2rem)] sm:p-6">
+      <div
+        onScroll={handleScroll}
+        className={cx(
+          "soft-scrollbar max-h-[calc(100vh-1rem)] w-full max-w-2xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-4 shadow-2xl shadow-slate-950/20 sm:max-h-[calc(100vh-2rem)] sm:p-6",
+          isScrolling && "scrollbar-visible",
+        )}
+      >
         <div className="mb-5 flex items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
+            <div className="text-lg font-semibold text-slate-950">{title}</div>
             {description ? <p className="mt-1 text-sm text-slate-500">{description}</p> : null}
           </div>
           <button

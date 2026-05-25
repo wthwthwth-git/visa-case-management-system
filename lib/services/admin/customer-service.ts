@@ -25,6 +25,38 @@ export type AdminCustomerListDTO = {
   total: number;
 };
 
+export class InvalidAdminCustomerInputError extends Error {
+  constructor(message = "Invalid admin customer input.") {
+    super(message);
+    this.name = "InvalidAdminCustomerInputError";
+  }
+}
+
+export class AdminCustomerAccessError extends Error {
+  constructor(message = "Admin customer access error.") {
+    super(message);
+    this.name = "AdminCustomerAccessError";
+  }
+}
+
+export type AdminCustomerUpdateInput = {
+  customerId: string;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  nationality?: string | null;
+};
+
+export type AdminCustomerDTO = {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  nationality: string | null;
+  birthday: string | null;
+  updatedAt: string;
+};
+
 function parsePositiveInt(value: string | undefined, fallback: number, max: number) {
   if (!value) {
     return fallback;
@@ -37,6 +69,21 @@ function parsePositiveInt(value: string | undefined, fallback: number, max: numb
   }
 
   return Math.min(parsed, max);
+}
+
+function normalizeRequiredString(value: string | undefined, fieldName: string): string {
+  const normalized = value?.trim();
+
+  if (!normalized) {
+    throw new InvalidAdminCustomerInputError(`${fieldName} is required.`);
+  }
+
+  return normalized;
+}
+
+function normalizeOptionalString(value: string | null | undefined): string | null {
+  const normalized = value?.trim();
+  return normalized ? normalized : null;
 }
 
 function toAdminCustomerListItemDTO(customer: {
@@ -59,6 +106,26 @@ function toAdminCustomerListItemDTO(customer: {
     nationality: customer.nationality,
     birthday: customer.birthday?.toISOString() ?? null,
     caseCount: customer._count.cases,
+    updatedAt: customer.updatedAt.toISOString(),
+  };
+}
+
+function toAdminCustomerDTO(customer: {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  nationality: string | null;
+  birthday: Date | null;
+  updatedAt: Date;
+}): AdminCustomerDTO {
+  return {
+    id: customer.id,
+    name: customer.name,
+    email: customer.email,
+    phone: customer.phone,
+    nationality: customer.nationality,
+    birthday: customer.birthday?.toISOString() ?? null,
     updatedAt: customer.updatedAt.toISOString(),
   };
 }
@@ -111,4 +178,41 @@ export async function listAdminCustomers(
     pageSize,
     total,
   };
+}
+
+export async function updateAdminCustomer(
+  input: AdminCustomerUpdateInput,
+): Promise<AdminCustomerDTO> {
+  const customerId = normalizeRequiredString(input.customerId, "customerId");
+  const name = normalizeRequiredString(input.name, "name");
+
+  const existingCustomer = await prisma.customer.findUnique({
+    where: { id: customerId },
+    select: { id: true },
+  });
+
+  if (!existingCustomer) {
+    throw new AdminCustomerAccessError();
+  }
+
+  const customer = await prisma.customer.update({
+    where: { id: customerId },
+    data: {
+      name,
+      email: normalizeOptionalString(input.email),
+      phone: normalizeOptionalString(input.phone),
+      nationality: normalizeOptionalString(input.nationality),
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      nationality: true,
+      birthday: true,
+      updatedAt: true,
+    },
+  });
+
+  return toAdminCustomerDTO(customer);
 }

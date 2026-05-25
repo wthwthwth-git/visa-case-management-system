@@ -218,6 +218,7 @@ describe("createCaseFromTemplateSelection", () => {
     expect(copiedRequirement).toMatchObject({
       caseId: "case-id",
       title: "Passport",
+      internalNote: null,
       sourceType: "template",
       status: "not_submitted",
       sourceTemplateId: "template-id",

@@ -230,7 +230,7 @@ export async function applyDocumentTemplateToCase(
           caseId,
           title: item.title,
           customerInstruction: item.customerInstruction,
-          internalNote: item.internalNote,
+          internalNote: null,
           isRequired: item.isRequired,
           responsibleParty: item.responsibleParty,
           sourceType: "template",

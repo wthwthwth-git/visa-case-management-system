@@ -92,15 +92,19 @@ export async function createPortalFileSignedUrl(input: {
     throw new FileNotAccessibleError();
   }
 
+  const isCompletedOfficeRequirement =
+    file.requirement.responsibleParty === "office" && file.requirement.status === "approved";
+
   const isAccessible =
     file.caseId === tokenContext.caseId &&
     file.requirement.caseId === tokenContext.caseId &&
     file.requirementId === file.requirement.id &&
-    file.requirement.portalVisible &&
-    file.requirement.portalDownloadable &&
-    file.portalVisible &&
-    file.portalDownloadable &&
-    file.status === "uploaded";
+    file.status === "uploaded" &&
+    ((file.requirement.portalVisible &&
+      file.portalVisible &&
+      file.portalDownloadable &&
+      (file.uploadedByType === "client" || file.requirement.portalDownloadable)) ||
+      isCompletedOfficeRequirement);
 
   if (!isAccessible) {
     throw new FileNotAccessibleError();

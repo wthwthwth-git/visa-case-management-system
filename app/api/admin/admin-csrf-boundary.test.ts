@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const adminMutationRoutes = [
   "app/api/admin/cases/route.ts",
+  "app/api/admin/cases/[caseId]/route.ts",
   "app/api/admin/cases/[caseId]/application-confirmations/route.ts",
   "app/api/admin/cases/[caseId]/apply-template/route.ts",
   "app/api/admin/cases/[caseId]/immigration-requests/route.ts",

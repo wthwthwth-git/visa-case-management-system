@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { ApplicationConfirmationStatus } from "@prisma/client";
 import { createTimelineEvent } from "../shared/timeline";
+import { createAdminNotification } from "../shared/admin-notification";
 import { createStorageSignedUrl } from "../shared/supabase-storage";
 import type { SignedUrlResult } from "../shared/signed-url";
 import { validatePortalToken } from "./portal-token-service";
@@ -267,6 +268,24 @@ export async function confirmPortalApplicationConfirmation(
       tx,
     );
 
+    await createAdminNotification(
+      {
+        caseId: tokenContext.caseId,
+        type: "application_confirmation_confirmed",
+        title: `客户确认了申请书：${currentConfirmation.title} v${currentConfirmation.version}`,
+        message: `客户确认了申请书：${currentConfirmation.title} v${currentConfirmation.version}`,
+        severity: "info",
+        targetType: "application_confirmation",
+        targetId: currentConfirmation.id,
+        metadata: {
+          confirmationId: currentConfirmation.id,
+          title: currentConfirmation.title,
+          version: currentConfirmation.version,
+        },
+      },
+      tx,
+    );
+
     return updatedConfirmation;
   });
 
@@ -330,6 +349,24 @@ export async function requestPortalApplicationConfirmationRevision(
           newStatus: "needs_revision",
           reason,
         }),
+      },
+      tx,
+    );
+
+    await createAdminNotification(
+      {
+        caseId: tokenContext.caseId,
+        type: "application_confirmation_revision_requested",
+        title: `客户要求修改申请书：${currentConfirmation.title} v${currentConfirmation.version}`,
+        message: `客户要求修改申请书：${currentConfirmation.title} v${currentConfirmation.version}`,
+        severity: "warning",
+        targetType: "application_confirmation",
+        targetId: currentConfirmation.id,
+        metadata: {
+          confirmationId: currentConfirmation.id,
+          title: currentConfirmation.title,
+          version: currentConfirmation.version,
+        },
       },
       tx,
     );

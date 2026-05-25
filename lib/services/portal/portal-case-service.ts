@@ -12,13 +12,22 @@ export async function getPortalCaseByToken(token: string): Promise<PortalCaseDTO
       customer: true,
       documentRequirements: {
         where: {
-          portalVisible: true,
-          responsibleParty: "customer",
+          OR: [
+            {
+              portalVisible: true,
+              responsibleParty: "customer",
+            },
+            {
+              responsibleParty: "office",
+              status: {
+                in: ["approved", "not_applicable"],
+              },
+            },
+          ],
         },
         include: {
           files: {
             where: {
-              portalVisible: true,
               status: "uploaded",
             },
             orderBy: { createdAt: "asc" },

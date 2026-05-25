@@ -87,7 +87,7 @@ describe("admin UI shell boundary", () => {
 
     expect(source).toContain("confirmImportantAction");
     expect(source).toContain("closeDisabled={isModalBusy}");
-    expect(source).toContain("明文访问令牌只显示一次。");
+    expect(source).toContain("客户访问链接只显示一次。");
     expect(source).toContain("onBusyChange={setIsModalBusy}");
   });
 

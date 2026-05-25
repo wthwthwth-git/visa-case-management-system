@@ -645,7 +645,38 @@ POST /api/client/portal/{token}/requirements/{requirementId}/files
 Timeline：
 
 - 必须记录 `file_uploaded`。
-- 如果资料要求从 `not_submitted` 变为 `submitted`，必须记录 `requirement_status_changed`。
+- 上传文件只保存为客户可编辑的已上传文件，不自动把资料要求变为 `submitted`。
+- 客户必须在确认文件无误后单独提交资料。
+
+### 10.2.1 Portal 提交资料
+
+```text
+POST /api/portal/[token]/requirements/[requirementId]/submit
+```
+
+规则：
+
+- 必须先校验 Portal token。
+- `requirementId` 必须属于 token 对应案件。
+- 仅允许客户可见且 `responsibleParty = customer` 的资料要求。
+- 必须至少存在 1 个已上传文件。
+- 已提交的资料再次提交应保持幂等，不重复写通知。
+- 提交成功后资料要求状态变为 `submitted`。
+- 提交成功后写 `requirement_status_changed` timeline。
+- 提交成功后创建后台通知，提醒事务所处理该资料。
+
+### 10.2.2 Portal 删除已上传文件
+
+```text
+DELETE /api/portal/[token]/requirements/[requirementId]/files/[fileId]
+```
+
+规则：
+
+- 只允许删除客户本人通过 Portal 上传的文件。
+- 只允许在资料未提交或需要修改时删除。
+- 删除后可重新上传正确文件。
+- 删除响应不得暴露 `storagePath`、`storageBucket`、signed URL 或 token 信息。
 
 ### 10.3 Admin 获取下载 URL
 
@@ -1130,6 +1161,8 @@ Implemented Portal routes:
 - `POST /api/portal/[token]/files/[fileId]/signed-url`
 - `POST /api/portal/[token]/application-confirmations/[confirmationId]/signed-url`
 - `POST /api/portal/[token]/requirements/[requirementId]/files`
+- `POST /api/portal/[token]/requirements/[requirementId]/submit`
+- `DELETE /api/portal/[token]/requirements/[requirementId]/files/[fileId]`
 - `POST /api/portal/[token]/application-confirmations/[confirmationId]/confirm`
 - `POST /api/portal/[token]/application-confirmations/[confirmationId]/request-revision`
 
@@ -1221,23 +1254,24 @@ Error responses must not reveal:
 - token hash
 - internal implementation details
 
-### 18.5 Admin Auth Placeholder
+### 18.5 Admin Auth Boundary
 
-`requireAdminAuth` currently exists only as a development placeholder.
+`requireAdminAuth` is backed by Auth.js session validation.
 
 Rules:
 
-- It does not represent production security.
-- It must be replaced with real admin authentication before production use or before real back-office pages are exposed.
-- Future admin mutation APIs must not go live without real admin authentication.
-- Routes should continue calling `requireAdminAuth` so the implementation can be replaced centrally.
+- Every `/api/admin/*` route must continue calling `requireAdminAuth(request)`.
+- Middleware is UX-only and must not replace route-level API auth.
+- Future admin mutation APIs must also call CSRF and rate-limit guards before service code.
+- Production runtime still requires OAuth callback, secure cookie, and environment isolation verification.
 
 ### 18.6 Test Command Convention
 
 Current test split:
 
 - `npm run test`: unit tests only, no database or network dependency.
-- `npm run test:integration`: DB integration tests that require `DATABASE_URL`.
+- `npm run env:check`: local/staging readiness check with redacted output only.
+- `npm run test:integration`: DB integration tests that require a safe dev/staging database environment.
 - `npm run test:token-constraint`: PostgreSQL partial unique index constraint test.
 
 Default unit tests must keep covering route import boundaries and Portal DTO safety.
@@ -1363,19 +1397,17 @@ Admin mutation responses must not include:
 
 Admin mutation responses may include explicit Admin DTO fields needed by the back office, but those fields must be intentionally shaped by the service layer.
 
-### 19.5 Admin Auth Placeholder Risk
+### 19.5 Admin Auth Runtime Risk
 
-`requireAdminAuth` is still a development placeholder.
+`requireAdminAuth` uses real Auth.js session validation.
 
 Rules:
 
-- It does not represent production security.
-- It must be replaced with real admin authentication before real deployment.
-- It must be replaced before back-office UI integration is exposed beyond local development.
-- It must be replaced before any public network access.
-- Admin mutation APIs must not go live while protected only by the placeholder.
+- Production OAuth callback URLs, secure cookies, and deployment secrets must be verified before public network access.
+- Admin mutation APIs must not go live if any route skips auth, CSRF, or rate-limit guards.
+- Middleware remains UX-only and does not replace route-level API auth.
 
-Current route tests verify that Admin routes call `requireAdminAuth`; they do not prove real production authentication.
+Current route tests verify that Admin routes call `requireAdminAuth`; they do not replace production runtime smoke tests.
 
 ### 19.6 Current API Coverage
 
@@ -1500,7 +1532,7 @@ The complete UI should not be treated as production-ready until formal admin aut
 
 ### 20.8 Risks
 
-- `requireAdminAuth` is still a development placeholder and is not production security.
+- production OAuth, secure cookie, and environment isolation still require runtime verification.
 - `plaintextToken` from token create can only be displayed once; the UI must handle this carefully.
 - The UI must handle partial failures between create case, apply template, and create token.
 - Without template list and customer search APIs, the create case UI will be awkward and error-prone.
@@ -2236,3 +2268,90 @@ Error behavior:
 Portal token creation remains a separate Admin API:
 
 - `POST /api/admin/cases/[caseId]/token/create`
+
+## Notification API Addendum
+
+Admin notifications are internal work reminders. They are separate from case timeline events.
+
+Implemented Admin notification APIs:
+
+- `GET /api/admin/notifications`
+- `POST /api/admin/notifications/[notificationId]/read`
+- `POST /api/admin/notifications/read-all`
+
+`GET /api/admin/notifications`:
+
+- requires `requireAdminAuth`.
+- supports `status=unread/read/archived/all`.
+- supports `page/pageSize`.
+- returns recent notifications and `unreadCount`.
+
+Mutation routes:
+
+- require `requireAdminAuth`.
+- require Admin CSRF.
+- require Admin rate limit.
+- only call `adminServices`.
+- do not import Prisma.
+- do not import `portalServices`.
+
+Notification response must not expose:
+
+- plaintext Portal token.
+- `tokenHash`.
+- session token.
+- CSRF token.
+- provider token.
+- signed URL.
+- `storagePath` / `storageBucket`.
+- raw cookie or authorization header.
+- passport or residence card numbers.
+
+Initial notification triggers:
+
+- Portal material submission creates an unread Admin notification after the customer explicitly clicks submit.
+- Portal application confirmation creates an unread Admin notification.
+- Portal application revision request creates an unread warning notification.
+- Portal rate limit trigger may create an unread warning notification.
+
+Customer notification is not implemented in V1. Requirement status messages are displayed only inside the customer Portal.
+
+## Admin Customer Update API Addendum
+
+Implemented Admin customer update API:
+
+- `PATCH /api/admin/customers/[customerId]`
+
+Purpose:
+
+- update the basic customer fields shown on the Admin case detail page.
+- does not create or delete cases.
+- does not update passport number, residence card number, address, token, file, or storage data.
+
+Allowed request body fields:
+
+- `name`
+- `email`
+- `phone`
+- `nationality`
+
+Route rules:
+
+- must call `requireAdminAuth`.
+- must call Admin CSRF guard.
+- must call Admin rate limit.
+- must only call `adminServices.updateAdminCustomer`.
+- must use route `customerId`; body `customerId` is ignored.
+- must not import Prisma or `portalServices`.
+- must not write timeline directly.
+
+Response forbidden fields:
+
+- `passportNumber`
+- `residenceCardNumber`
+- `address`
+- `tokenHash`
+- plaintext token
+- signed URL
+- `storagePath` / `storageBucket`
+- raw Prisma objects.

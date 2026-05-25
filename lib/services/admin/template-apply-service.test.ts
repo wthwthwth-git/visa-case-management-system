@@ -172,7 +172,7 @@ describe("admin apply document template service", () => {
       caseId: "case-id",
       title: "Passport",
       customerInstruction: "Upload passport.",
-      internalNote: "Check expiry.",
+      internalNote: null,
       isRequired: true,
       responsibleParty: "customer",
       sourceType: "template",

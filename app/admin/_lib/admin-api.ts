@@ -222,11 +222,37 @@ export type AdminRequirement = {
 
 export type AdminTimelineEvent = {
   id: string;
+  caseId: string | null;
   eventType: string;
   actorType: string;
   summary: string;
   targetType: string | null;
+  targetId: string | null;
+  metadata: unknown;
   createdAt: string;
+  updatedAt: string;
+};
+
+export type AdminNotification = {
+  id: string;
+  caseId: string | null;
+  type: string;
+  title: string;
+  message: string;
+  status: "unread" | "read" | "archived";
+  severity: "info" | "warning" | "critical";
+  targetType: string | null;
+  targetId: string | null;
+  createdAt: string;
+  readAt: string | null;
+};
+
+export type AdminNotificationList = {
+  items: AdminNotification[];
+  page: number;
+  pageSize: number;
+  total: number;
+  unreadCount: number;
 };
 
 type ApiSuccess<T> = {

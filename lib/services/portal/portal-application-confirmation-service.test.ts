@@ -2,12 +2,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
   const tx = {
+    case: {
+      findUnique: vi.fn(),
+    },
     applicationConfirmation: {
       findUnique: vi.fn(),
       findFirst: vi.fn(),
       update: vi.fn(),
     },
     timelineEvent: {
+      create: vi.fn(),
+    },
+    adminNotification: {
       create: vi.fn(),
     },
   };
@@ -77,6 +83,11 @@ describe("portal application confirmation service", () => {
       caseId,
     });
     mocks.transaction.mockImplementation(async (callback) => callback(mocks.tx));
+    mocks.tx.case.findUnique.mockResolvedValue({
+      customer: {
+        name: "Seed Customer",
+      },
+    });
     mocks.tx.applicationConfirmation.findUnique.mockResolvedValue(createConfirmation());
     mocks.tx.applicationConfirmation.findFirst.mockResolvedValue({ id: confirmationId });
     mocks.tx.applicationConfirmation.update.mockImplementation(async ({ data }) => ({
@@ -88,6 +99,7 @@ describe("portal application confirmation service", () => {
       createdAt,
     }));
     mocks.tx.timelineEvent.create.mockImplementation(async ({ data }) => data);
+    mocks.tx.adminNotification.create.mockImplementation(async ({ data }) => data);
     mocks.findUnique.mockResolvedValue(createConfirmation());
     mocks.findFirst.mockResolvedValue({ id: confirmationId });
     mocks.createStorageSignedUrl.mockResolvedValue(signedUrl);
@@ -101,6 +113,7 @@ describe("portal application confirmation service", () => {
     const updateArg = mocks.tx.applicationConfirmation.update.mock.calls[0][0];
     const completedTimeline = mocks.tx.timelineEvent.create.mock.calls[0][0].data;
     const statusTimeline = mocks.tx.timelineEvent.create.mock.calls[1][0].data;
+    const notificationArg = mocks.tx.adminNotification.create.mock.calls[0][0].data;
     const payload = JSON.stringify(result);
 
     expect(mocks.validatePortalToken).toHaveBeenCalledWith("plaintext-test-token");
@@ -116,6 +129,16 @@ describe("portal application confirmation service", () => {
       oldStatus: "pending",
       newStatus: "confirmed",
     });
+    expect(notificationArg).toMatchObject({
+      caseId,
+      type: "application_confirmation_confirmed",
+      severity: "info",
+      targetType: "application_confirmation",
+      targetId: confirmationId,
+    });
+    expect(JSON.stringify(notificationArg.metadata)).not.toContain("plaintext-test-token");
+    expect(JSON.stringify(notificationArg.metadata)).not.toContain("tokenHash");
+    expect(JSON.stringify(notificationArg.metadata)).not.toContain("signedUrl");
     expect(payload).not.toContain("storageBucket");
     expect(payload).not.toContain("storagePath");
   });
@@ -170,6 +193,7 @@ describe("portal application confirmation service", () => {
     });
     const updateArg = mocks.tx.applicationConfirmation.update.mock.calls[0][0];
     const timelineMetadata = mocks.tx.timelineEvent.create.mock.calls[0][0].data.metadata;
+    const notificationArg = mocks.tx.adminNotification.create.mock.calls[0][0].data;
     const timelinePayload = JSON.stringify(timelineMetadata);
 
     expect(updateArg.data).toEqual({
@@ -186,6 +210,15 @@ describe("portal application confirmation service", () => {
     });
     expect(timelinePayload).not.toContain("Please update the address.");
     expect(timelinePayload).not.toContain("comment");
+    expect(notificationArg).toMatchObject({
+      caseId,
+      type: "application_confirmation_revision_requested",
+      severity: "warning",
+      targetType: "application_confirmation",
+      targetId: confirmationId,
+    });
+    expect(JSON.stringify(notificationArg.metadata)).not.toContain("Please update the address.");
+    expect(JSON.stringify(notificationArg.metadata)).not.toContain("comment");
   });
 
   it("rejects unsafe reason or comment content", async () => {

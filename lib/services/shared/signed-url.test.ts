@@ -44,6 +44,7 @@ type MockDocumentFile = {
   mimeType: string;
   fileSize: bigint;
   status: "uploaded" | "removed" | "replaced";
+  uploadedByType: "internal" | "client" | "system";
   portalVisible: boolean;
   portalDownloadable: boolean;
   requirement: {
@@ -72,6 +73,7 @@ function createAccessibleFile(): MockDocumentFile {
     mimeType: "application/pdf",
     fileSize: BigInt(1234),
     status: "uploaded",
+    uploadedByType: "internal",
     portalVisible: true,
     portalDownloadable: true,
     requirement: {
@@ -160,6 +162,26 @@ describe("signed URL service", () => {
       }),
     ).rejects.toBeInstanceOf(FileNotAccessibleError);
     expect(mocks.createStorageSignedUrl).not.toHaveBeenCalled();
+  });
+
+  it("allows portal download for files uploaded by the client even when requirement download is disabled", async () => {
+    mocks.findUnique.mockResolvedValue(
+      createFileOverride({
+        uploadedByType: "client",
+        requirement: {
+          ...createAccessibleFile().requirement,
+          portalDownloadable: false,
+        },
+      }),
+    );
+
+    const result = await createPortalFileSignedUrl({
+      token: "plaintext-test-token",
+      fileId,
+    });
+
+    expect(result.signedUrl).toBe(signedUrl);
+    expect(mocks.createStorageSignedUrl).toHaveBeenCalled();
   });
 
   it("uses a unified portal error when token validation fails", async () => {

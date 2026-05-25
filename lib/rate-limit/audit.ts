@@ -50,6 +50,26 @@ export async function writeRateLimitAudit(input: RateLimitAuditInput) {
         reason: input.reason,
       },
     });
+
+    if (input.routeGroup.startsWith("portal_")) {
+      const { createAdminNotification } = await import("../services/shared/admin-notification");
+
+      await createAdminNotification({
+        type: "portal_rate_limit_triggered",
+        title: "客户访问链接触发频率限制",
+        message: "客户访问链接触发频率限制，请确认是否存在异常访问。",
+        severity: "warning",
+        targetType: "security",
+        metadata: {
+          routeGroup: input.routeGroup,
+          method: input.method,
+          path: input.path,
+          keyType: input.keyType,
+          reason: input.reason,
+          retryAfterSeconds: input.retryAfterSeconds,
+        },
+      });
+    }
   } catch {
     // Rate limit audit must not mask the rate limit response or leak internals.
   }

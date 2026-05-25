@@ -1,6 +1,8 @@
 import type {
   ApplicationConfirmationStatus,
+  ActorType,
   CasePhase,
+  ResponsibleParty,
   RequirementSourceType,
   RequirementStatus,
 } from "@prisma/client";
@@ -18,6 +20,8 @@ export type PortalFileSource = {
   mimeType: string;
   fileSize: bigint | number | string;
   createdAt: Date;
+  uploadedByType: ActorType;
+  portalVisible: boolean;
   portalDownloadable: boolean;
 };
 
@@ -26,11 +30,19 @@ export type PortalRequirementSource = {
   title: string;
   customerInstruction: string | null;
   isRequired: boolean;
+  responsibleParty: ResponsibleParty;
   status: RequirementStatus;
   sourceType: RequirementSourceType;
   portalDownloadable: boolean;
   files: PortalFileSource[];
 };
+
+function toPortalFileDisplayName(originalFileName: string) {
+  const trimmed = originalFileName.trim();
+  const withoutPath = trimmed.split(/[\\/]/).pop()?.trim();
+
+  return withoutPath || "上传文件";
+}
 
 export type PortalApplicationConfirmationSource = {
   id: string;
@@ -51,31 +63,55 @@ export type PortalCaseSource = {
   applicationConfirmations: PortalApplicationConfirmationSource[];
 };
 
+function isRequirementVisibleInPortal(requirement: PortalRequirementSource) {
+  if (requirement.responsibleParty === "customer") {
+    return true;
+  }
+
+  return requirement.status === "approved" || requirement.status === "not_applicable";
+}
+
 export function toPortalRequirementDTO(
   requirement: PortalRequirementSource,
 ): PortalRequirementDTO {
+  const isCompletedOfficeRequirement =
+    requirement.responsibleParty === "office" &&
+    (requirement.status === "approved" || requirement.status === "not_applicable");
+  const visibleFiles =
+    requirement.responsibleParty === "office"
+      ? isCompletedOfficeRequirement
+        ? requirement.files
+        : []
+      : requirement.files.filter((file) => file.portalVisible);
+
   return {
     id: requirement.id,
     title: requirement.title,
     customerInstruction: requirement.customerInstruction,
     isRequired: requirement.isRequired,
+    responsibleParty: requirement.responsibleParty,
     clientStatus: mapRequirementStatusToPortalStatus(requirement.status),
     sourceType: requirement.sourceType,
-    files: requirement.files.map(
+    files: visibleFiles.map(
       (file): PortalFileDTO => ({
         id: file.id,
+        displayName: toPortalFileDisplayName(file.originalFileName),
         mimeType: file.mimeType,
         fileSize: file.fileSize.toString(),
         createdAt: file.createdAt.toISOString(),
-        portalDownloadable: file.portalDownloadable && requirement.portalDownloadable,
+        portalDownloadable:
+          isCompletedOfficeRequirement ||
+          (file.portalDownloadable &&
+            (file.uploadedByType === "client" || requirement.portalDownloadable)),
       }),
     ),
   };
 }
 
 export function toPortalCaseDTO(visaCase: PortalCaseSource): PortalCaseDTO {
-  const requirements: PortalRequirementDTO[] =
-    visaCase.documentRequirements.map(toPortalRequirementDTO);
+  const requirements: PortalRequirementDTO[] = visaCase.documentRequirements
+    .filter(isRequirementVisibleInPortal)
+    .map(toPortalRequirementDTO);
 
   const applicationConfirmations: PortalApplicationConfirmationDTO[] =
     visaCase.applicationConfirmations.map((confirmation) => ({

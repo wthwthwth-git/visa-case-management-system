@@ -12,6 +12,7 @@ const adminUploadRoutes = ["app/api/admin/requirements/[requirementId]/files/rou
 
 const adminDestructiveRoutes = [
   "app/api/admin/cases/route.ts",
+  "app/api/admin/cases/[caseId]/route.ts",
   "app/api/admin/cases/[caseId]/application-confirmations/route.ts",
   "app/api/admin/cases/[caseId]/apply-template/route.ts",
   "app/api/admin/cases/[caseId]/immigration-requests/route.ts",

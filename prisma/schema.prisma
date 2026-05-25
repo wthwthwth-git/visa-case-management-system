@@ -125,6 +125,34 @@ enum AdminAuthAuditResult {
   blocked
 }
 
+enum AdminNotificationType {
+  portal_file_uploaded
+  application_confirmation_confirmed
+  application_confirmation_revision_requested
+  portal_rate_limit_triggered
+}
+
+enum AdminNotificationStatus {
+  unread
+  read
+  archived
+}
+
+enum AdminNotificationSeverity {
+  info
+  warning
+  critical
+}
+
+enum AdminNotificationTargetType {
+  case
+  case_document_requirement
+  document_file
+  application_confirmation
+  customer_access_token
+  security
+}
+
 model Customer {
   id                  String    @id @default(uuid()) @db.Uuid
   name                String
@@ -162,6 +190,7 @@ model Case {
   applicationConfirmations ApplicationConfirmation[]
   internalNotes            InternalNote[]
   timelineEvents           TimelineEvent[]
+  adminNotifications       AdminNotification[]
 
   @@index([customerId])
   @@index([casePhase])
@@ -442,5 +471,31 @@ model AdminAuthAudit {
   @@index([email, createdAt])
   @@index([eventType, createdAt])
   @@index([result, createdAt])
+  @@index([createdAt])
+}
+
+model AdminNotification {
+  id         String                       @id @default(uuid()) @db.Uuid
+  caseId     String?                      @db.Uuid
+  type       AdminNotificationType
+  title      String
+  message    String                       @db.Text
+  status     AdminNotificationStatus      @default(unread)
+  severity   AdminNotificationSeverity    @default(info)
+  targetType AdminNotificationTargetType?
+  targetId   String?                      @db.Uuid
+  /// Must not contain plaintext tokens, token hashes, session tokens, CSRF tokens, signed URLs, storage paths, storage buckets, passport numbers, residence card numbers, secrets, raw cookies, or authorization headers.
+  metadata   Json?
+  readAt     DateTime?
+  createdAt  DateTime                     @default(now())
+  updatedAt  DateTime                     @updatedAt
+
+  case Case? @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId, createdAt])
+  @@index([status, createdAt])
+  @@index([type, createdAt])
+  @@index([severity, createdAt])
+  @@index([targetType, targetId])
   @@index([createdAt])
 }

@@ -53,7 +53,7 @@ Portal service responsibilities currently include:
 
 - Token validation.
 - Portal case DTO retrieval.
-- Portal file upload.
+- Portal file upload and explicit material submission.
 - Portal file signed URL retrieval.
 - Portal application confirmation confirmation and revision request.
 - Portal application confirmation signed URL retrieval.
@@ -147,14 +147,18 @@ Portal signed URL services must validate the portal token and derive `caseId` fr
 - `DocumentFile` stores metadata only.
 - Storage upload must succeed before `DocumentFile` is written.
 - If DB write fails after Storage upload, the service attempts to delete the uploaded object.
+- Portal upload stores files as editable customer uploads and does not submit the requirement.
 - Portal upload does not return `storagePath`, `storageBucket`, or `originalFileName`.
 - Upload writes `file_uploaded` timeline metadata without storage fields or original file name.
+- Customers may remove their uploaded files before submission or while the requirement is in `needs_more`.
+- `submitPortalDocumentRequirement` is the only Portal action that moves the requirement to `submitted`.
+- Submit writes `requirement_status_changed` timeline metadata and creates the Admin notification.
 
 ### Requirement Review
 
 - Admin-only.
-- Portal cannot directly change requirement review status.
-- Upload may only move `not_submitted` to `submitted`.
+- Portal cannot directly review or approve requirements.
+- Portal can only explicitly submit a customer-visible requirement after at least one file has been uploaded.
 - Review service handles `submitted`, `needs_more`, `approved`, and `not_applicable`.
 - `approved` must display to Portal as `accepted`.
 - `internalNote` never enters Portal DTO or timeline metadata.
@@ -308,18 +312,19 @@ Signed URL:
 
 Error responses must not reveal token status, resource existence, storage paths, storage buckets, token hashes, or internal implementation details.
 
-### 9.5 Admin Auth Placeholder
+### 9.5 Admin Auth Boundary
 
-`requireAdminAuth` is currently a development placeholder.
+`requireAdminAuth` is now backed by Auth.js session validation.
 
-It does not provide production security. It must be replaced with real admin authentication before production use or before real back-office pages are exposed.
+Every `/api/admin/*` route must still call `requireAdminAuth(request)` at route level. Middleware is UX-only and must not be treated as API security.
 
-Future admin mutation routes must not be released without real admin authentication.
+Future admin mutation routes must also use CSRF and rate-limit guards before calling services.
 
 ### 9.6 Test Split
 
 - `npm run test`: unit tests only; no database or network dependency.
-- `npm run test:integration`: DB integration tests.
+- `npm run env:check`: redacted local/staging runtime configuration readiness check.
+- `npm run test:integration`: DB integration tests; must run only against safe dev/staging data.
 - `npm run test:token-constraint`: PostgreSQL partial unique index test.
 
 Unit tests must continue checking route import boundaries, Portal DTO forbidden fields, signed URL response shape, and safe error mapping.
@@ -434,13 +439,13 @@ Admin mutation responses must not include:
 
 Admin DTOs may include intentionally exposed back-office fields, but they must be shaped by services and not returned as raw Prisma objects.
 
-### 10.5 Admin Auth Placeholder Risk
+### 10.5 Admin Auth Boundary
 
-`requireAdminAuth` is currently only a development placeholder.
+Admin routes use Auth.js-backed `requireAdminAuth(request)`.
 
-It does not provide production security. Before any real deployment, public network exposure, or back-office UI integration, it must be replaced by real admin authentication.
+Before production, the remaining auth-related requirements are runtime verification of production OAuth callback URLs, secure cookies, environment isolation, and staging smoke tests.
 
-Admin mutation APIs must not be considered safe to operate in production until that replacement is complete.
+Admin mutation APIs must continue to call auth, CSRF, and rate-limit guards before business services.
 
 ### 10.6 Current API Coverage
 
@@ -487,7 +492,7 @@ If UI work starts earlier, it should be limited to a readonly shell and should n
 
 ### 10.9 Risks
 
-- Admin mutation routes are protected only by placeholder auth.
+- Admin mutation routes may become unsafe if future routes skip auth, CSRF, or rate-limit guards.
 - New routes may accidentally bypass services and write directly to DB, Storage, or timeline.
 - Raw storage fields may leak if service DTOs are not used.
 - `plaintextToken` may leak outside the single regenerate response if future code reuses token service results carelessly.
@@ -758,17 +763,17 @@ Exception:
 
 ### 13.6 Demo Boundary
 
-The current UI is suitable for an internal development demo only.
+The current UI is suitable for an internal development demo and controlled staging review.
 
-It is not production-ready because:
+It is not production-ready until:
 
-- `requireAdminAuth` is a placeholder.
-- formal Admin auth is not implemented.
-- public deployment would expose back-office mutation routes without production-grade protection.
+- production OAuth callback and secure cookie behavior are smoke-tested.
+- production/staging database, storage, and Redis isolation are verified.
+- public deployment, monitoring, and rollback procedures are confirmed.
 
 Demo must clearly label unfinished areas:
 
-- formal Admin auth
+- production auth/runtime verification
 - Portal UI polish
 - file delete/replace
 - application confirmation preview/download
@@ -783,7 +788,7 @@ Demo must clearly label unfinished areas:
 - Plaintext token could be copied into persistent browser storage by future changes.
 - Signed URL preview/download work could accidentally cache signed URLs.
 - Storage fields could leak into normal display views.
-- Demo users could mistake placeholder Admin auth for production-ready security.
+- Demo users could mistake the staging auth setup for production-ready deployment.
 
 ## 14. Phase 8-1D Addendum: Admin Auth Boundary Freeze
 
@@ -1286,3 +1291,79 @@ Response forbidden fields:
 - plaintext token
 - raw request metadata
 - raw Prisma relation objects
+
+## 19. Admin Notification Boundary
+
+`AdminNotification` is an internal work reminder model. It is not a customer-facing feature and it is not a replacement for `TimelineEvent`.
+
+Boundary:
+
+- Timeline records long-term case history.
+- Notification records unread/read operational reminders for the Admin workspace.
+- The same business event may write both timeline and notification.
+- Portal UI must never read Admin notifications.
+- Admin notification API must only call `adminServices`.
+- UI must call `/api/admin/notifications*` and must not import Prisma or services.
+
+Initial triggers:
+
+- `submitPortalDocumentRequirement` creates `portal_file_uploaded` after the customer clicks submit.
+- `confirmPortalApplicationConfirmation` creates `application_confirmation_confirmed`.
+- `requestPortalApplicationConfirmationRevision` creates `application_confirmation_revision_requested`.
+- Portal rate limit audit may create `portal_rate_limit_triggered`.
+
+Notification metadata must not contain:
+
+- plaintext Portal token.
+- `tokenHash`.
+- signed URL.
+- `storagePath` / `storageBucket`.
+- session token.
+- CSRF token.
+- provider token.
+- raw cookie.
+- authorization header.
+- passport number.
+- residence card number.
+- secrets.
+
+V1 intentionally does not implement:
+
+- email sending.
+- LINE or WeChat sending.
+- browser push.
+- customer notification center.
+- scheduled reminders.
+- multi-employee assignment.
+- read receipt analytics.
+
+## 20. Admin Customer Update Boundary
+
+Admin customer updates are limited to basic customer contact fields used by the case detail UI:
+
+- name.
+- email.
+- phone.
+- nationality.
+
+The service is `adminServices.updateAdminCustomer`.
+
+Boundary rules:
+
+- Admin UI must call `PATCH /api/admin/customers/[customerId]`.
+- Admin UI must not import Prisma or services.
+- The API route must call Admin auth, CSRF, and rate limit before the service.
+- The API route must use route `customerId`; body `customerId` is ignored.
+- The service must return an Admin DTO, not a Prisma object.
+
+Customer update DTO must not include:
+
+- passport number.
+- residence card number.
+- address.
+- token or token hash.
+- signed URL.
+- storage path or bucket.
+- raw request metadata.
+
+Portal customer data remains read-only from the customer side in V1.

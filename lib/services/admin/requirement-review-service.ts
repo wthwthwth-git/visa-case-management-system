@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { RequirementStatus } from "@prisma/client";
+import type { RequirementStatus, ResponsibleParty } from "@prisma/client";
 import { createTimelineEvent } from "../shared/timeline";
 
 const maxReasonLength = 500;
@@ -85,7 +85,19 @@ function normalizeReason(reason: string | undefined) {
   return normalized;
 }
 
-function assertAllowedTransition(oldStatus: RequirementStatus, newStatus: RequirementStatus) {
+function assertAllowedTransition(
+  oldStatus: RequirementStatus,
+  newStatus: RequirementStatus,
+  responsibleParty: ResponsibleParty,
+) {
+  if (responsibleParty === "office") {
+    if (newStatus !== "submitted" && newStatus !== "approved" && newStatus !== "not_applicable") {
+      throw new InvalidRequirementStatusTransitionError();
+    }
+
+    return;
+  }
+
   if (!allowedTransitions[oldStatus].includes(newStatus)) {
     throw new InvalidRequirementStatusTransitionError();
   }
@@ -93,11 +105,22 @@ function assertAllowedTransition(oldStatus: RequirementStatus, newStatus: Requir
 
 function buildRequirementUpdateData(input: {
   newStatus: RequirementStatus;
+  responsibleParty: ResponsibleParty;
   customerInstruction?: string;
   internalNote?: string;
 }) {
+  const officePortalVisibility =
+    input.responsibleParty === "office"
+      ? {
+          portalVisible: input.newStatus === "approved" || input.newStatus === "not_applicable",
+          portalDownloadable:
+            input.newStatus === "approved" || input.newStatus === "not_applicable",
+        }
+      : {};
+
   return {
     status: input.newStatus,
+    ...officePortalVisibility,
     ...(input.customerInstruction === undefined
       ? {}
       : { customerInstruction: input.customerInstruction }),
@@ -148,7 +171,7 @@ export async function reviewCaseDocumentRequirement(
       throw new RequirementReviewAccessError();
     }
 
-    assertAllowedTransition(requirement.status, input.newStatus);
+    assertAllowedTransition(requirement.status, input.newStatus, requirement.responsibleParty);
 
     if (
       requirement.responsibleParty === "customer" &&
@@ -163,6 +186,7 @@ export async function reviewCaseDocumentRequirement(
       where: { id: requirement.id },
       data: buildRequirementUpdateData({
         newStatus: input.newStatus,
+        responsibleParty: requirement.responsibleParty,
         customerInstruction,
         internalNote,
       }),
@@ -176,6 +200,20 @@ export async function reviewCaseDocumentRequirement(
         updatedAt: true,
       },
     });
+
+    if (requirement.responsibleParty === "office") {
+      await tx.documentFile.updateMany({
+        where: {
+          requirementId: requirement.id,
+          status: "uploaded",
+        },
+        data: {
+          portalVisible: input.newStatus === "approved" || input.newStatus === "not_applicable",
+          portalDownloadable:
+            input.newStatus === "approved" || input.newStatus === "not_applicable",
+        },
+      });
+    }
 
     await createTimelineEvent(
       {

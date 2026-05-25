@@ -50,6 +50,7 @@ describe("POST /api/portal/[token]/requirements/[requirementId]/files", () => {
     });
     mocks.uploadPortalDocumentFile.mockResolvedValue({
       id: "file-id",
+      displayName: "passport.pdf",
       mimeType: "application/pdf",
       fileSize: "5",
       createdAt: "2026-01-01T00:00:00.000Z",
@@ -93,7 +94,7 @@ describe("POST /api/portal/[token]/requirements/[requirementId]/files", () => {
       expect(payload).not.toContain(field);
     }
 
-    expect(payload).not.toContain("passport.pdf");
+    expect(payload).toContain("passport.pdf");
   });
 
   it("returns INVALID_UPLOAD when file is missing", async () => {

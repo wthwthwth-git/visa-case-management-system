@@ -40,3 +40,66 @@ samp {
     "Liberation Mono",
     monospace;
 }
+
+* {
+  scrollbar-width: none;
+  scrollbar-color: transparent transparent;
+}
+
+html.scrollbar-active,
+.scrollbar-active,
+.scrollbar-visible {
+  scrollbar-width: none;
+  scrollbar-color: transparent transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+html.scrollbar-active::-webkit-scrollbar,
+.scrollbar-active::-webkit-scrollbar,
+.scrollbar-visible::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-clip: content-box;
+  background-color: transparent;
+  border: 2px solid transparent;
+  border-radius: 999px;
+}
+
+html.scrollbar-active::-webkit-scrollbar-thumb,
+.scrollbar-active::-webkit-scrollbar-thumb,
+.scrollbar-visible::-webkit-scrollbar-thumb {
+  background-color: transparent;
+}
+
+.global-scrollbar-overlay {
+  bottom: 0;
+  pointer-events: none;
+  position: fixed;
+  right: 4px;
+  top: 0;
+  width: 8px;
+  z-index: 9999;
+}
+
+.global-scrollbar-overlay-thumb {
+  background-color: rgba(100, 116, 139, 0.42);
+  border-radius: 999px;
+  opacity: 0;
+  transition: opacity 160ms ease;
+  width: 6px;
+}
+
+.global-scrollbar-overlay-visible .global-scrollbar-overlay-thumb {
+  opacity: 1;
+}

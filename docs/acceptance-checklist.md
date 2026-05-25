@@ -92,9 +92,14 @@ This checklist is used for manual and automated acceptance after each phase. It 
 - [ ] Database stores only `DocumentFile` metadata.
 - [ ] Storage upload must succeed before DB file record is created.
 - [ ] DB failure after Storage upload attempts cleanup.
-- [ ] Upload may move requirement from `not_submitted` to `submitted`.
+- [ ] Portal upload does not move requirement from `not_submitted` to `submitted`.
+- [ ] Portal submission requires at least one uploaded file.
+- [ ] Portal submission moves a customer-visible requirement to `submitted`.
+- [ ] Portal can delete a customer-uploaded file before submission or while the requirement is in `needs_more`.
+- [ ] Portal cannot delete customer-uploaded files after submission.
 - [ ] Upload never automatically approves a requirement.
 - [ ] Upload writes `file_uploaded` timeline event.
+- [ ] Portal submission writes `requirement_status_changed` timeline event.
 - [ ] Timeline metadata does not include original filename, storage path, storage bucket, signed URL, token, or sensitive IDs.
 - [ ] Portal upload response does not expose `storagePath`, `storageBucket`, `originalFileName`, signed URL, or token hash.
 
@@ -235,6 +240,8 @@ This checklist is used for manual and automated acceptance after each phase. It 
 - [ ] No fallback secret is generated.
 - [ ] Changing `TOKEN_HASH_SECRET` is documented as invalidating existing Portal tokens.
 - [ ] Storage env variables are checked only on Storage-dependent paths.
+- [ ] `npm run env:check` reports required env readiness using only redacted values.
+- [ ] `npm run env:check` never prints secrets, tokens, signed URLs, or full database URLs.
 
 ## 18. Admin CSRF Acceptance
 
@@ -331,3 +338,20 @@ This checklist is used for manual and automated acceptance after each phase. It 
 - [ ] V1 does not implement complex notification systems.
 - [ ] V1 does not implement automatic form filling.
 - [ ] V1 does not implement third-party visa system integration.
+
+## 23. Admin Notification Acceptance
+
+- [ ] `AdminNotification` is a separate model and is not mixed into `TimelineEvent`.
+- [ ] Admin notification metadata never contains plaintext Portal token, `tokenHash`, signed URL, storage path, storage bucket, session token, CSRF token, provider token, raw cookie, authorization header, passport number, residence card number, or secrets.
+- [ ] Portal material submission creates an unread Admin notification.
+- [ ] Portal application confirmation creates an unread Admin notification.
+- [ ] Portal application revision request creates an unread warning Admin notification.
+- [ ] Portal rate limit trigger may create an unread warning Admin notification.
+- [ ] `GET /api/admin/notifications` requires Admin auth.
+- [ ] Notification read mutation APIs require Admin auth, Admin CSRF, and Admin rate limit.
+- [ ] Notification API routes only call `adminServices`.
+- [ ] Notification API routes do not import Prisma or `portalServices`.
+- [ ] Admin header displays unread notification count.
+- [ ] Admin header notification dropdown displays recent unread notifications.
+- [ ] Clicking a case-related notification can navigate to the corresponding case.
+- [ ] V1 does not send customer email, LINE, WeChat, browser push, or scheduled reminders.

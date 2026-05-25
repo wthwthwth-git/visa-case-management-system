@@ -658,7 +658,7 @@ Without template list and customer search APIs, the create case UI will require 
 
 ### Risks
 
-- `requireAdminAuth` is still a development placeholder and cannot be used for production.
+- Admin auth is implemented with Auth.js, but production OAuth/cookie/runtime verification is still required.
 - `plaintextToken` can only be shown once after token creation.
 - The UI must handle partial failures across the three-step flow.
 - Full UI work before template list and customer search APIs may create brittle workflows.
@@ -675,7 +675,7 @@ The current Admin UI includes:
 - `/admin/cases/new`
 - `/admin/cases/[caseId]`
 
-These pages are development back-office pages. They depend on the existing Admin API routes and must not be treated as production-safe until real Admin authentication replaces the placeholder auth.
+These pages are back-office pages protected by Admin API auth, CSRF, and rate-limit boundaries. They must still be treated as non-production until production OAuth/cookie/runtime verification and environment isolation are complete.
 
 ### Completed Admin UI Capabilities
 
@@ -715,7 +715,7 @@ The Admin UI must continue to follow these rules:
 - Mutation errors should keep user input intact.
 - Case phase warnings are warnings, not failed submissions.
 - The UI should remain usable at narrow screen widths.
-- The development-only banner must remain visible while Admin auth is a placeholder.
+- The development-only banner must remain visible until production deployment, monitoring, and environment isolation are verified.
 
 ### Current Admin Detail Layout
 
@@ -785,7 +785,7 @@ Recommended demo flow:
 
 During demo, explicitly mark these as still in development:
 
-- real Admin authentication
+- production Admin auth/runtime verification
 - Portal UI polish
 - signed URL preview/download in Admin UI
 - file delete/replace
@@ -795,8 +795,8 @@ During demo, explicitly mark these as still in development:
 
 ### Demo Risks
 
-- `requireAdminAuth` is still a placeholder.
-- The app must not be exposed publicly as a real back office.
+- Production OAuth callback, secure cookies, and staging/prod environment isolation still require runtime verification.
+- The app must not be exposed publicly as a real back office until production rollout checks pass.
 - `TOKEN_HASH_SECRET` must exist before token create/validate flows.
 - Changing `TOKEN_HASH_SECRET` makes existing Portal tokens unverifiable.
 - Token regenerate revokes the previous active token.
