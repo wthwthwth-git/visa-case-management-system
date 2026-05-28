@@ -42,6 +42,7 @@ export type PortalRequirementDTO = {
   id: string;
   title: string;
   customerInstruction: string | null;
+  dueDate?: string | null;
   isRequired: boolean;
   responsibleParty: ResponsibleParty;
   clientStatus: PortalDocumentStatus;
@@ -56,12 +57,18 @@ export type PortalApplicationConfirmationDTO = {
   status: ApplicationConfirmationStatus;
 };
 
+export type PortalCaseSubmissionInfoDTO = {
+  submittedAt: string | null;
+  submissionNumber: string | null;
+};
+
 export type PortalCaseDTO = {
   caseId: string;
   caseNumber: string;
   customerName: string;
   targetVisaType: string;
   casePhase: CasePhase;
+  submissionInfo?: PortalCaseSubmissionInfoDTO | null;
   requirements: PortalRequirementDTO[];
   applicationConfirmations: PortalApplicationConfirmationDTO[];
 };

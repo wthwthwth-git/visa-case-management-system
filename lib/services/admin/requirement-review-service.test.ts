@@ -142,6 +142,30 @@ describe("requirement review service", () => {
     expect(mocks.tx.caseDocumentRequirement.update).toHaveBeenCalled();
   });
 
+  it("allows approved to move back to submitted", async () => {
+    mocks.tx.caseDocumentRequirement.findUnique.mockResolvedValue(
+      createRequirement({ status: "approved" }),
+    );
+
+    const result = await reviewCaseDocumentRequirement({
+      caseId,
+      requirementId,
+      newStatus: "submitted",
+    });
+    const updateArg = mocks.tx.caseDocumentRequirement.update.mock.calls[0][0];
+    const timelineMetadata = mocks.tx.timelineEvent.create.mock.calls[0][0].data.metadata;
+
+    expect(result.status).toBe("submitted");
+    expect(updateArg.data).toEqual({
+      status: "submitted",
+    });
+    expect(timelineMetadata).toEqual({
+      requirementId,
+      oldStatus: "approved",
+      newStatus: "submitted",
+    });
+  });
+
   it("rejects approved to needs_more without reason or customerInstruction", async () => {
     mocks.tx.caseDocumentRequirement.findUnique.mockResolvedValue(
       createRequirement({ status: "approved" }),

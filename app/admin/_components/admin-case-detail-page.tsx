@@ -24,6 +24,7 @@ import {
   ProgressStepper,
   SectionHeader,
   StatusBadge,
+  displayCasePhaseLabel,
   displayLabel,
 } from "./ui";
 
@@ -47,6 +48,7 @@ type ActiveModal =
   | { type: "review"; requirement: AdminRequirement }
   | { type: "upload"; requirement: AdminRequirement }
   | { type: "note"; requirement: AdminRequirement }
+  | { type: "dueDate"; requirement: AdminRequirement }
   | { type: "customRequirement"; responsibleParty: "customer" | "office" }
   | { type: "immigration" }
   | { type: "changeHistory" }
@@ -150,7 +152,7 @@ function formatChangeHistoryDetail(event: AdminTimelineEvent, lookup: Requiremen
       const oldPhase = getMetadataString(event, "oldPhase");
       const newPhase = getMetadataString(event, "newPhase");
       return oldPhase && newPhase
-        ? `案件阶段由「${displayLabel(oldPhase)}」变更为「${displayLabel(newPhase)}」。`
+        ? `案件阶段由「${displayCasePhaseLabel(oldPhase)}」变更为「${displayCasePhaseLabel(newPhase)}」。`
         : "案件阶段已变更。";
     }
     case "template_items_selected_copied": {
@@ -198,6 +200,78 @@ function getLatestCasePhaseReason(events: AdminTimelineEvent[]) {
   }
 
   return null;
+}
+
+function getLatestCaseSubmissionInfo(events: AdminTimelineEvent[]) {
+  for (const event of events) {
+    if (event.eventType !== "case_phase_changed") {
+      continue;
+    }
+
+    const submittedAt = getMetadataString(event, "submittedAt")?.trim() || null;
+    const submissionNumber = getMetadataString(event, "submissionNumber")?.trim() || null;
+
+    if (submittedAt || submissionNumber) {
+      return {
+        submittedAt,
+        submissionNumber,
+      };
+    }
+  }
+
+  return null;
+}
+
+function formatDateOnly(value: string | null) {
+  if (!value) {
+    return "-";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function toDateInputValue(value: string | null | undefined) {
+  if (!value) {
+    return "";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return date.toISOString().slice(0, 10);
+}
+
+function todayDateInputValue() {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60 * 1000;
+  return new Date(now.getTime() - offset).toISOString().slice(0, 10);
+}
+
+function getRequirementIdFromHash() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const prefix = "#requirement-";
+
+  if (!window.location.hash.startsWith(prefix)) {
+    return null;
+  }
+
+  return decodeURIComponent(window.location.hash.slice(prefix.length));
 }
 
 function createPortalAccessUrl(plaintextToken: string): string {
@@ -330,30 +404,25 @@ const casePhaseSteps = [
   "collecting_documents",
   "preparing_application",
   "submitted",
-  "under_review",
   "approved",
 ];
 
-const casePhaseTransitionOptions: Record<string, string[]> = {
-  draft: ["collecting_documents"],
-  collecting_documents: ["preparing_application"],
-  preparing_application: ["submitted", "collecting_documents"],
-  submitted: ["under_review", "preparing_application"],
-  under_review: ["approved", "submitted", "collecting_documents"],
-  approved: [],
-};
-
 function getAllowedCasePhaseOptions(currentPhase: string) {
-  return (casePhaseTransitionOptions[currentPhase] ?? []).filter((phase) =>
-    casePhaseSteps.includes(phase),
-  );
+  return casePhaseSteps.filter((phase) => phase !== currentPhase);
+}
+
+function shouldShowSubmissionInfo(casePhase: string) {
+  const submittedIndex = casePhaseSteps.indexOf("submitted");
+  const currentIndex = casePhaseSteps.indexOf(casePhase);
+
+  return submittedIndex >= 0 && currentIndex >= submittedIndex;
 }
 
 function formatCasePhaseSubmitError(error: unknown) {
   const message = toAdminErrorMessage(error, "案件阶段切换失败。请检查阶段和原因后重试。");
 
   if (message === "Invalid request." || /transition|not allowed/i.test(message)) {
-    return "该阶段不能从当前阶段直接切换。请按案件流程选择允许的下一阶段。";
+    return "案件阶段切换失败。请选择不同的案件阶段后重试。";
   }
 
   return message;
@@ -504,6 +573,10 @@ function formatChangeHistorySummary(value: string) {
     "file uploaded.": "文件已上传",
     "document file uploaded.": "文件已上传",
     "file removed.": "文件已删除",
+    "requirement submitted.": "客户已提交资料",
+    "requirement submission withdrawn.": "客户已撤回资料",
+    "office requirement confirmed by client.": "客户已确认事务所资料",
+    "client requested office requirement revision.": "客户要求修改事务所资料",
     "requirement status changed.": "材料状态已变更",
     "case phase changed.": "案件阶段已变更",
     "application confirmation created.": "申请书确认已创建",
@@ -551,6 +624,19 @@ function getRequirementStatusBadgeValue(requirement: AdminRequirement) {
   }
 
   return getEffectiveRequirementStatus(requirement);
+}
+
+function sortApprovedRequirementsLast(requirements: AdminRequirement[]) {
+  return requirements.toSorted((first, second) => {
+    const firstApproved = getEffectiveRequirementStatus(first) === "approved";
+    const secondApproved = getEffectiveRequirementStatus(second) === "approved";
+
+    if (firstApproved === secondApproved) {
+      return 0;
+    }
+
+    return firstApproved ? 1 : -1;
+  });
 }
 
 function getRequirementReviewButtonLabel(requirement: AdminRequirement) {
@@ -658,6 +744,7 @@ function RequirementGroup({
   onReview,
   onUpload,
   onNote,
+  onDueDate,
   onPreviewFile,
   onDownloadAllFiles,
   onDeleteFile,
@@ -667,6 +754,7 @@ function RequirementGroup({
   deletingFileId,
   deletingRequirementId,
   deletingRequirementRecordId,
+  focusedRequirementId,
 }: {
   title: string;
   emptyMessage: string;
@@ -677,6 +765,7 @@ function RequirementGroup({
   onReview: (requirement: AdminRequirement) => void;
   onUpload: (requirement: AdminRequirement) => void;
   onNote: (requirement: AdminRequirement) => void;
+  onDueDate: (requirement: AdminRequirement) => void;
   onPreviewFile: (file: AdminRequirementFile) => void;
   onDownloadAllFiles: (requirement: AdminRequirement) => void;
   onDeleteFile: (file: AdminRequirementFile) => void;
@@ -686,6 +775,7 @@ function RequirementGroup({
   deletingFileId: string | null;
   deletingRequirementId: string | null;
   deletingRequirementRecordId: string | null;
+  focusedRequirementId?: string | null;
 }) {
   const [isExpanded, setIsExpanded] = useState(true);
   const headerAction =
@@ -746,19 +836,33 @@ function RequirementGroup({
           const statusBadgeValue = getRequirementStatusBadgeValue(requirement);
           const visibleInternalNote = getVisibleRequirementInternalNote(requirement);
           const visibleNoteDisplay = getRequirementNoteDisplay(requirement);
+          const effectiveStatus = getEffectiveRequirementStatus(requirement);
+          const showDueDate =
+            requirement.dueDate && effectiveStatus === "not_submitted";
+          const canEditDueDate =
+            requirement.responsibleParty === "customer" && effectiveStatus === "not_submitted";
           const isDownloadingAll = downloadingRequirementId === requirement.id;
           const isDeletingAll = deletingRequirementId === requirement.id;
           const isDeletingRequirement = deletingRequirementRecordId === requirement.id;
 
           return (
           <div
+            id={`requirement-${requirement.id}`}
             key={requirement.id}
             onClick={(event) => event.stopPropagation()}
-            className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-100"
+            className={[
+              "scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-100 transition",
+              focusedRequirementId === requirement.id ? "ring-2 ring-blue-300 ring-offset-2" : "",
+            ].join(" ")}
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <div className="font-medium text-slate-950">{displayChineseText(requirement.title)}</div>
+                {showDueDate ? (
+                  <span className="rounded-full border border-amber-100 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
+                    截止日期：{formatDateOnly(requirement.dueDate)}
+                  </span>
+                ) : null}
               </div>
               <StatusBadge value={statusBadgeValue} />
             </div>
@@ -849,8 +953,17 @@ function RequirementGroup({
                   onClick={() => onNote(requirement)}
                   className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                 >
-                  {visibleInternalNote ? "修改备注" : "添加备注"}
+                  {visibleInternalNote || requirement.customerInstruction ? "修改备注" : "添加备注"}
                 </button>
+                {canEditDueDate ? (
+                  <button
+                    type="button"
+                    onClick={() => onDueDate(requirement)}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    {requirement.dueDate ? "修改截止日期" : "设置截止日期"}
+                  </button>
+                ) : null}
               </div>
               <button
                 type="button"
@@ -1030,6 +1143,9 @@ function RequirementNoteForm({
   onSuccess: (result: MutationResult) => Promise<void>;
   onBusyChange: (isBusy: boolean) => void;
 }) {
+  const [customerInstruction, setCustomerInstruction] = useState(
+    requirement.responsibleParty === "office" ? "" : (requirement.customerInstruction ?? ""),
+  );
   const [internalNote, setInternalNote] = useState(
     getVisibleRequirementInternalNote(requirement) ?? "",
   );
@@ -1049,11 +1165,17 @@ function RequirementNoteForm({
       setIsSubmitting(true);
       await patchJson(`/api/admin/requirements/${requirement.id}/note`, {
         caseId,
+        customerInstruction,
         internalNote,
       });
-      await onSuccess({ message: internalNote.trim() ? "内部备注已保存。" : "内部备注已清空。" });
+      await onSuccess({
+        message:
+          customerInstruction.trim() || internalNote.trim()
+            ? "备注已保存。"
+            : "备注已清空。",
+      });
     } catch (submitError) {
-      setError(toAdminErrorMessage(submitError, "内部备注保存失败，请稍后重试。"));
+      setError(toAdminErrorMessage(submitError, "备注保存失败，请稍后重试。"));
     } finally {
       setIsSubmitting(false);
     }
@@ -1063,12 +1185,26 @@ function RequirementNoteForm({
     <form onSubmit={submitNote} className="grid gap-4">
       <InlineError message={error} />
       <div className="grid gap-2">
+        <label className="text-sm font-medium text-slate-700" htmlFor="requirementCustomerInstruction">
+          补充说明
+        </label>
+        <textarea
+          id="requirementCustomerInstruction"
+          value={customerInstruction}
+          onChange={(event) => setCustomerInstruction(event.target.value)}
+          className="min-h-28 rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+          placeholder="向客户补充说明"
+        />
+      </div>
+      <div className="grid gap-2">
+        <label className="text-sm font-medium text-slate-700" htmlFor="requirementInternalNote">
+          内部备注
+        </label>
         <textarea
           id="requirementInternalNote"
-          aria-label="备注"
           value={internalNote}
           onChange={(event) => setInternalNote(event.target.value)}
-          className="min-h-36 rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+          className="min-h-28 rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
           placeholder="仅后台可见，不会显示给客户。"
         />
       </div>
@@ -1076,6 +1212,78 @@ function RequirementNoteForm({
         isSubmitting={isSubmitting}
         onCancel={onCancel}
         submitLabel="保存备注"
+        submittingLabel="保存中..."
+      />
+    </form>
+  );
+}
+
+function RequirementDueDateForm({
+  caseId,
+  requirement,
+  onCancel,
+  onSuccess,
+  onBusyChange,
+}: {
+  caseId: string;
+  requirement: AdminRequirement;
+  onCancel: () => void;
+  onSuccess: (result: MutationResult) => Promise<void>;
+  onBusyChange: (isBusy: boolean) => void;
+}) {
+  const [dueDate, setDueDate] = useState(toDateInputValue(requirement.dueDate));
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    onBusyChange(isSubmitting);
+    return () => onBusyChange(false);
+  }, [isSubmitting, onBusyChange]);
+
+  async function submitDueDate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+
+    try {
+      setIsSubmitting(true);
+      await patchJson(`/api/admin/requirements/${requirement.id}/note`, {
+        caseId,
+        dueDate: dueDate || null,
+      });
+      await onSuccess({
+        message: dueDate ? "截止日期已保存。" : "截止日期已清除。",
+      });
+    } catch (submitError) {
+      setError(toAdminErrorMessage(submitError, "截止日期保存失败，请稍后重试。"));
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submitDueDate} className="grid gap-4">
+      <InlineError message={error} />
+      <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+        <div className="text-xs font-semibold text-slate-500">资料名称</div>
+        <div className="mt-1 font-semibold text-slate-950">
+          {displayChineseText(requirement.title)}
+        </div>
+      </div>
+      <div className="grid gap-2">
+        <label className="text-sm font-medium text-slate-700" htmlFor="requirementDueDateOnly">
+          截止日期
+        </label>
+        <DateTextInput
+          id="requirementDueDateOnly"
+          value={dueDate}
+          min={todayDateInputValue()}
+          onChange={(event) => setDueDate(event.target.value)}
+        />
+      </div>
+      <FormActions
+        isSubmitting={isSubmitting}
+        onCancel={onCancel}
+        submitLabel="保存截止日期"
         submittingLabel="保存中..."
       />
     </form>
@@ -1346,9 +1554,6 @@ function ImmigrationRequestForm({
       customerInstruction: optionalFormString(form, "customerInstruction"),
       internalNote: optionalFormString(form, "internalNote"),
       dueDate: optionalFormString(form, "dueDate"),
-      reason: optionalFormString(form, "reason"),
-      portalVisible: form.get("portalVisible") === "on",
-      portalDownloadable: form.get("portalDownloadable") === "on",
       setCasePhase: form.get("setCasePhase") === "on",
     };
 
@@ -1393,7 +1598,7 @@ function ImmigrationRequestForm({
       </div>
       <div className="grid gap-2">
         <label className="text-sm font-medium text-slate-700" htmlFor="immigrationCustomerInstruction">
-          给客户看的说明
+          补充说明
         </label>
         <textarea
           id="immigrationCustomerInstruction"
@@ -1412,38 +1617,18 @@ function ImmigrationRequestForm({
           className="min-h-20 rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
         />
       </div>
-      <div className="grid gap-3 md:grid-cols-2">
-        <div className="grid gap-2">
-          <label className="text-sm font-medium text-slate-700" htmlFor="immigrationDueDate">
-            截止日期
-          </label>
-          <DateTextInput
-            id="immigrationDueDate"
-            name="dueDate"
-            min={todayDateValue}
-            placeholder="YYYY-MM-DD"
-          />
-        </div>
-        <div className="grid gap-2">
-          <label className="text-sm font-medium text-slate-700" htmlFor="immigrationReason">
-            原因
-          </label>
-          <input
-            id="immigrationReason"
-            name="reason"
-            className="rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
-          />
-        </div>
+      <div className="grid gap-2">
+        <label className="text-sm font-medium text-slate-700" htmlFor="immigrationDueDate">
+          截止日期
+        </label>
+        <DateTextInput
+          id="immigrationDueDate"
+          name="dueDate"
+          min={todayDateValue}
+          placeholder="YYYY-MM-DD"
+        />
       </div>
       <div className="grid gap-2 text-sm text-slate-600">
-        <label className="flex items-center gap-2">
-          <input name="portalVisible" type="checkbox" className="h-4 w-4 rounded border-slate-300" />
-          Portal 可见
-        </label>
-        <label className="flex items-center gap-2">
-          <input name="portalDownloadable" type="checkbox" className="h-4 w-4 rounded border-slate-300" />
-          Portal 可下载
-        </label>
         <label className="flex items-center gap-2">
           <input name="setCasePhase" type="checkbox" className="h-4 w-4 rounded border-slate-300" />
           同时将案件阶段切换为资料收集中
@@ -1498,6 +1683,8 @@ function CustomRequirementForm({
         title,
         responsibleParty,
         customerInstruction: optionalFormString(form, "customerInstruction"),
+        dueDate:
+          responsibleParty === "customer" ? optionalFormString(form, "dueDate") : undefined,
       });
       await onSuccess({ message: "追加资料已添加。" });
     } catch (submitError) {
@@ -1532,6 +1719,18 @@ function CustomRequirementForm({
           className="min-h-24 rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
         />
       </div>
+      {responsibleParty === "customer" ? (
+        <div className="grid gap-2">
+          <label className="text-sm font-medium text-slate-700" htmlFor="customRequirementDueDate">
+            截止日期
+          </label>
+          <DateTextInput
+            id="customRequirementDueDate"
+            name="dueDate"
+            min={todayDateInputValue()}
+          />
+        </div>
+      ) : null}
       <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
         {responsibleParty === "customer"
           ? "该资料会显示在客户画面中。"
@@ -1816,7 +2015,7 @@ function CasePhaseChangeForm({
     }
 
     if (!phaseOptions.includes(newPhase)) {
-      setError("该阶段不能从当前阶段直接切换。请按案件流程选择允许的下一阶段。");
+      setError("请选择不同的案件阶段。");
       return;
     }
 
@@ -1828,7 +2027,7 @@ function CasePhaseChangeForm({
     if (
       needsConfirmation &&
       !confirmImportantAction(
-        `案件阶段将从“${displayLabel(currentPhase)}”切换为“${displayLabel(newPhase)}”。`,
+        `案件阶段将从“${displayCasePhaseLabel(currentPhase)}”切换为“${displayCasePhaseLabel(newPhase)}”。`,
       )
     ) {
       return;
@@ -1844,7 +2043,6 @@ function CasePhaseChangeForm({
           submittedAt,
           submissionNumber,
           resultAt,
-          allowWithWarnings: false,
         },
       );
       const warningMessage =
@@ -1853,7 +2051,7 @@ function CasePhaseChangeForm({
           : undefined;
 
       await onSuccess({
-        message: `案件阶段已从 ${displayLabel(result.oldPhase)} 切换为 ${displayLabel(result.newPhase)}。`,
+        message: `案件阶段已从 ${displayCasePhaseLabel(result.oldPhase)} 切换为 ${displayCasePhaseLabel(result.newPhase)}。`,
         warningMessage,
       });
     } catch (submitError) {
@@ -1882,16 +2080,14 @@ function CasePhaseChangeForm({
           </option>
           {phaseOptions.map((phase) => (
             <option key={phase} value={phase}>
-              {displayLabel(phase)}
+              {displayCasePhaseLabel(phase)}
             </option>
           ))}
         </select>
         {phaseOptions.length > 0 ? (
-          <p className="text-xs text-slate-500">
-            当前阶段可切换到：{phaseOptions.map(displayLabel).join("、")}
-          </p>
+          <p className="text-xs text-slate-500">可选择任意其他案件阶段。</p>
         ) : (
-          <p className="text-xs text-slate-500">当前阶段没有可继续切换的下一阶段。</p>
+          <p className="text-xs text-slate-500">暂无可切换的案件阶段。</p>
         )}
         {needsConfirmation ? (
           <p className="text-xs text-amber-700">该阶段切换提交前会要求确认，建议填写原因。</p>
@@ -2366,6 +2562,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
   const [isModalBusy, setIsModalBusy] = useState(false);
   const [isImmigrationExpanded, setIsImmigrationExpanded] = useState(true);
   const [isDeletingCase, setIsDeletingCase] = useState(false);
+  const [focusedRequirementId, setFocusedRequirementId] = useState<string | null>(null);
 
   const loadCase = useCallback(async () => {
     setIsLoading(true);
@@ -2402,6 +2599,45 @@ export function AdminCaseDetailPage({ caseId }: Props) {
       isMounted = false;
     };
   }, [loadCase]);
+
+  const scrollToRequirementFromHash = useCallback(() => {
+    const requirementId = getRequirementIdFromHash();
+
+    if (!requirementId) {
+      return;
+    }
+
+    const element = document.getElementById(`requirement-${requirementId}`);
+
+    if (!element) {
+      return;
+    }
+
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+    setFocusedRequirementId(requirementId);
+
+    if (window.location.hash.startsWith("#requirement-")) {
+      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+    }
+
+    window.setTimeout(() => {
+      setFocusedRequirementId((current) => (current === requirementId ? null : current));
+    }, 2200);
+  }, []);
+
+  useEffect(() => {
+    if (requirements.length === 0) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(scrollToRequirementFromHash, 120);
+    window.addEventListener("hashchange", scrollToRequirementFromHash);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      window.removeEventListener("hashchange", scrollToRequirementFromHash);
+    };
+  }, [requirements, scrollToRequirementFromHash]);
 
   async function handleMutationSuccess(result: MutationResult) {
     setActiveModal(null);
@@ -2669,33 +2905,47 @@ export function AdminCaseDetailPage({ caseId }: Props) {
 
   const grouped = useMemo(
     () => ({
-      customer: requirements.filter(
-        (requirement) =>
-          requirement.responsibleParty === "customer" &&
-          requirement.sourceType !== "immigration_request",
+      customer: sortApprovedRequirementsLast(
+        requirements.filter(
+          (requirement) =>
+            requirement.responsibleParty === "customer" &&
+            requirement.sourceType !== "immigration_request",
+        ),
       ),
-      office: requirements.filter(
-        (requirement) =>
-          requirement.responsibleParty === "office" &&
-          requirement.sourceType !== "immigration_request",
+      office: sortApprovedRequirementsLast(
+        requirements.filter(
+          (requirement) =>
+            requirement.responsibleParty === "office" &&
+            requirement.sourceType !== "immigration_request",
+        ),
       ),
-      immigration: requirements.filter(
-        (requirement) => requirement.sourceType === "immigration_request",
+      immigration: sortApprovedRequirementsLast(
+        requirements.filter(
+          (requirement) => requirement.sourceType === "immigration_request",
+        ),
       ),
-      immigrationCustomer: requirements.filter(
-        (requirement) =>
-          requirement.sourceType === "immigration_request" &&
-          requirement.responsibleParty === "customer",
+      immigrationCustomer: sortApprovedRequirementsLast(
+        requirements.filter(
+          (requirement) =>
+            requirement.sourceType === "immigration_request" &&
+            requirement.responsibleParty === "customer",
+        ),
       ),
-      immigrationOffice: requirements.filter(
-        (requirement) =>
-          requirement.sourceType === "immigration_request" &&
-          requirement.responsibleParty === "office",
+      immigrationOffice: sortApprovedRequirementsLast(
+        requirements.filter(
+          (requirement) =>
+            requirement.sourceType === "immigration_request" &&
+            requirement.responsibleParty === "office",
+        ),
       ),
     }),
     [requirements],
   );
   const latestCasePhaseReason = useMemo(() => getLatestCasePhaseReason(timeline), [timeline]);
+  const latestCaseSubmissionInfo = useMemo(
+    () => getLatestCaseSubmissionInfo(timeline),
+    [timeline],
+  );
 
   return (
     <main className="w-full">
@@ -2748,7 +2998,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                   {formatVisaBusinessSummary(caseDetail.currentVisaType, caseDetail.targetVisaType)}
                 </p>
               </div>
-              <StatusBadge value={caseDetail.casePhase} />
+              <StatusBadge value={caseDetail.casePhase} label={displayCasePhaseLabel(caseDetail.casePhase)} />
             </div>
           </DashboardCard>
 
@@ -2822,7 +3072,33 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                     </span>
                   </div>
                 </div>
-                <ProgressStepper steps={casePhaseSteps} currentStep={caseDetail.casePhase} />
+                <ProgressStepper
+                  steps={casePhaseSteps}
+                  currentStep={caseDetail.casePhase}
+                  formatLabel={displayCasePhaseLabel}
+                />
+                {latestCaseSubmissionInfo && shouldShowSubmissionInfo(caseDetail.casePhase) ? (
+                  <div className="mt-5 border-t border-slate-100 pt-4">
+                    <div className="grid gap-4 text-sm sm:grid-cols-2">
+                      {latestCaseSubmissionInfo.submittedAt ? (
+                        <div>
+                          <div className="text-slate-500">提交日期</div>
+                          <div className="mt-1 font-semibold text-slate-950">
+                            {formatDateOnly(latestCaseSubmissionInfo.submittedAt)}
+                          </div>
+                        </div>
+                      ) : null}
+                      {latestCaseSubmissionInfo.submissionNumber ? (
+                        <div>
+                          <div className="text-slate-500">受理号</div>
+                          <div className="mt-1 break-words font-semibold text-slate-950">
+                            {latestCaseSubmissionInfo.submissionNumber}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
                 {latestCasePhaseReason ? (
                   <div className="mt-5 border-t border-slate-100 pt-4">
                     <div className="text-sm text-slate-500">备注</div>
@@ -2853,6 +3129,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                   onReview={(requirement) => setActiveModal({ type: "review", requirement })}
                   onUpload={(requirement) => setActiveModal({ type: "upload", requirement })}
                   onNote={(requirement) => setActiveModal({ type: "note", requirement })}
+                  onDueDate={(requirement) => setActiveModal({ type: "dueDate", requirement })}
                   onPreviewFile={openFilePreview}
                   onDownloadAllFiles={downloadAllFiles}
                   onDeleteFile={requestDeleteUploadedFile}
@@ -2862,6 +3139,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                   deletingFileId={deletingFileId}
                   deletingRequirementId={deletingRequirementId}
                   deletingRequirementRecordId={deletingRequirementRecordId}
+                  focusedRequirementId={focusedRequirementId}
                 />
                 <RequirementGroup
                   title="事务所资料"
@@ -2882,6 +3160,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                   onReview={(requirement) => setActiveModal({ type: "review", requirement })}
                   onUpload={(requirement) => setActiveModal({ type: "upload", requirement })}
                   onNote={(requirement) => setActiveModal({ type: "note", requirement })}
+                  onDueDate={(requirement) => setActiveModal({ type: "dueDate", requirement })}
                   onPreviewFile={openFilePreview}
                   onDownloadAllFiles={downloadAllFiles}
                   onDeleteFile={requestDeleteUploadedFile}
@@ -2891,6 +3170,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                   deletingFileId={deletingFileId}
                   deletingRequirementId={deletingRequirementId}
                   deletingRequirementRecordId={deletingRequirementRecordId}
+                  focusedRequirementId={focusedRequirementId}
                 />
               </div>
               <DashboardCard>
@@ -2927,6 +3207,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                     onReview={(requirement) => setActiveModal({ type: "review", requirement })}
                     onUpload={(requirement) => setActiveModal({ type: "upload", requirement })}
                     onNote={(requirement) => setActiveModal({ type: "note", requirement })}
+                    onDueDate={(requirement) => setActiveModal({ type: "dueDate", requirement })}
                     onPreviewFile={openFilePreview}
                     onDownloadAllFiles={downloadAllFiles}
                     onDeleteFile={requestDeleteUploadedFile}
@@ -2936,6 +3217,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                     deletingFileId={deletingFileId}
                     deletingRequirementId={deletingRequirementId}
                     deletingRequirementRecordId={deletingRequirementRecordId}
+                    focusedRequirementId={focusedRequirementId}
                   />
                   <div className="border-t border-slate-100 pt-6">
                     <RequirementGroup
@@ -2946,6 +3228,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                       onReview={(requirement) => setActiveModal({ type: "review", requirement })}
                       onUpload={(requirement) => setActiveModal({ type: "upload", requirement })}
                       onNote={(requirement) => setActiveModal({ type: "note", requirement })}
+                      onDueDate={(requirement) => setActiveModal({ type: "dueDate", requirement })}
                       onPreviewFile={openFilePreview}
                       onDownloadAllFiles={downloadAllFiles}
                       onDeleteFile={requestDeleteUploadedFile}
@@ -2955,6 +3238,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                       deletingFileId={deletingFileId}
                       deletingRequirementId={deletingRequirementId}
                       deletingRequirementRecordId={deletingRequirementRecordId}
+                      focusedRequirementId={focusedRequirementId}
                     />
                   </div>
                 </div> : null}
@@ -3089,6 +3373,22 @@ export function AdminCaseDetailPage({ caseId }: Props) {
         </Modal>
       ) : null}
 
+      {activeModal?.type === "dueDate" ? (
+        <Modal
+          title="设置截止日期"
+          onClose={closeActiveModal}
+          closeDisabled={isModalBusy}
+        >
+          <RequirementDueDateForm
+            caseId={caseId}
+            requirement={activeModal.requirement}
+            onCancel={closeActiveModal}
+            onSuccess={handleMutationSuccess}
+            onBusyChange={setIsModalBusy}
+          />
+        </Modal>
+      ) : null}
+
       {activeModal?.type === "immigration" ? (
         <Modal
           title="添加入管追加材料"
@@ -3128,7 +3428,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
       {activeModal?.type === "phase" && caseDetail ? (
         <Modal
           title="切换案件阶段"
-          description={`当前阶段：${displayLabel(caseDetail.casePhase)}`}
+          description={`当前阶段：${displayCasePhaseLabel(caseDetail.casePhase)}`}
           onClose={closeActiveModal}
           closeDisabled={isModalBusy}
         >

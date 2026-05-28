@@ -4,7 +4,15 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { displayVisaType } from "@/app/_lib/chinese-display";
 import { apiGet, formatDateTime, toAdminErrorMessage, type AdminCaseList } from "../_lib/admin-api";
-import { DataTable, DashboardCard, EmptyState, ErrorBanner, LoadingState, StatusBadge, displayLabel } from "./ui";
+import {
+  DataTable,
+  DashboardCard,
+  EmptyState,
+  ErrorBanner,
+  LoadingState,
+  StatusBadge,
+  displayCasePhaseLabel,
+} from "./ui";
 
 type VisaBusinessTypeFilter = "all" | "certification" | "renewal" | "change";
 
@@ -13,7 +21,6 @@ const casePhaseFilterOptions = [
   "collecting_documents",
   "preparing_application",
   "submitted",
-  "under_review",
   "approved",
 ];
 
@@ -132,7 +139,7 @@ export function AdminCasesPage() {
             <option value="all">全部阶段</option>
             {casePhaseFilterOptions.map((phase) => (
               <option key={phase} value={phase}>
-                {displayLabel(phase)}
+                {displayCasePhaseLabel(phase)}
               </option>
             ))}
           </select>
@@ -196,7 +203,11 @@ export function AdminCasesPage() {
                 <div className="text-slate-800">{displayVisaType(item.targetVisaType)}</div>
               </td>
               <td className="px-5 py-4">
-                <StatusBadge value={item.casePhase} className="min-w-24 justify-center" />
+                <StatusBadge
+                  value={item.casePhase}
+                  label={displayCasePhaseLabel(item.casePhase)}
+                  className="min-w-24 justify-center"
+                />
               </td>
               <td className="px-5 py-4 text-slate-600">{formatDateTime(item.updatedAt)}</td>
             </tr>

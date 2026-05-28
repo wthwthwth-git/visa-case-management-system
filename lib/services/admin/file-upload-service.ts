@@ -160,7 +160,7 @@ export async function uploadAdminDocumentFile(
           caseId: input.caseId,
           eventType: "file_uploaded",
           actorType: uploadedByType,
-          summary: "File uploaded.",
+          summary: "文件已上传",
           targetType: "document_file",
           targetId: createdFile.id,
           metadata: {

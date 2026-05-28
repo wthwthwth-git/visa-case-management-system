@@ -871,7 +871,6 @@ export function AdminNewCasePage() {
                               <span className="mt-1 block text-xs text-slate-500">
                                 {item.responsibleParty === "customer" ? "客户提交材料" : "事务所做成材料"}
                                 {item.dueDate ? ` / 截止日期 ${item.dueDate}` : ""}
-                                {item.portalDownloadable ? " / 允许下载" : ""}
                               </span>
                             </span>
                             {!createdCase ? (
@@ -931,7 +930,7 @@ export function AdminNewCasePage() {
                                 className="min-h-20 rounded-2xl border border-slate-200 px-3 py-2.5 text-sm font-normal outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                               />
                             </label>
-                            <div className="grid gap-3 md:grid-cols-3">
+                            <div className="grid gap-3 md:grid-cols-2">
                               <label className="grid gap-1 text-sm font-medium text-slate-700">
                                 截止日期
                                 <DateTextInput
@@ -943,40 +942,7 @@ export function AdminNewCasePage() {
                                   className="h-12 font-normal"
                                 />
                               </label>
-                              <label className="grid gap-1 text-sm font-medium text-slate-700">
-                                客户页面
-                                <span className="flex h-12 items-center gap-2 rounded-2xl border border-slate-200 px-3 text-sm font-normal text-slate-900">
-                                  <input
-                                    type="checkbox"
-                                    checked={item.portalVisible}
-                                    onChange={(event) => updateCustomItem(item.id, { portalVisible: event.target.checked })}
-                                    disabled={Boolean(createdCase) || item.portalDownloadable}
-                                    className="h-4 w-4 rounded border-slate-300"
-                                  />
-                                  Portal 可见
-                                </span>
-                              </label>
-                              <label className="grid gap-1 text-sm font-medium text-slate-700">
-                                下载权限
-                                <span className="flex h-12 items-center gap-2 rounded-2xl border border-slate-200 px-3 text-sm font-normal text-slate-900">
-                                  <input
-                                    type="checkbox"
-                                    checked={item.portalDownloadable}
-                                    onChange={(event) =>
-                                      updateCustomItem(item.id, { portalDownloadable: event.target.checked })
-                                    }
-                                    disabled={Boolean(createdCase)}
-                                    className="h-4 w-4 rounded border-slate-300"
-                                  />
-                                  允许下载
-                                </span>
-                              </label>
                             </div>
-                            {item.portalDownloadable ? (
-                              <p className="text-xs text-amber-700">
-                                允许下载时，系统会强制 Portal 可见。
-                              </p>
-                            ) : null}
                             {!createdCase ? (
                               <div className="flex flex-wrap gap-2">
                                 <button

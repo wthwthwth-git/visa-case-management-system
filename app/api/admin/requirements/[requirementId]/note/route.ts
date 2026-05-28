@@ -28,6 +28,32 @@ function optionalString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+function parseOptionalDate(value: unknown): Date | null | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null || value === "") {
+    return null;
+  }
+
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return undefined;
+  }
+
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+    return undefined;
+  }
+
+  return parsed;
+}
+
 export async function PATCH(request: Request, context: RouteContext): Promise<Response> {
   try {
     const adminContext = await requireAdminAuth(request);
@@ -40,15 +66,18 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Re
 
     const { requirementId } = await context.params;
     const body = await readJsonBody(request);
+    const dueDate = parseOptionalDate(body.dueDate);
 
-    if (typeof body.caseId !== "string") {
+    if (typeof body.caseId !== "string" || (body.dueDate !== undefined && dueDate === undefined)) {
       return jsonError("INVALID_REQUEST");
     }
 
     const updatedRequirement = await adminServices.updateRequirementInternalNote({
       caseId: body.caseId,
       requirementId,
+      customerInstruction: optionalString(body.customerInstruction),
       internalNote: optionalString(body.internalNote),
+      dueDate,
     });
 
     return jsonData(updatedRequirement);

@@ -54,7 +54,7 @@ export function AdminLoginPage({
           <p className="text-sm font-semibold text-blue-600">后台登录</p>
           <h1 className="mt-2 text-2xl font-semibold text-slate-950">登录后台管理</h1>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            请使用已加入允许名单的 Google 账号登录。客户 Portal 仍使用独立 token 链接，不走后台登录。
+            请使用已加入允许名单的 Google 账号登录。
           </p>
         </div>
 

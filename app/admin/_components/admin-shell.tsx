@@ -25,6 +25,20 @@ const navItems = [
   },
 ];
 
+function getNotificationHref(notification: NonNullable<AdminNotificationList["items"]>[number]) {
+  if (!notification.caseId) {
+    return null;
+  }
+
+  const caseHref = `/admin/cases/${notification.caseId}`;
+
+  if (notification.targetType === "case_document_requirement" && notification.targetId) {
+    return `${caseHref}#requirement-${encodeURIComponent(notification.targetId)}`;
+  }
+
+  return caseHref;
+}
+
 function NotificationButton() {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
@@ -96,11 +110,13 @@ function NotificationButton() {
   }
 
   async function openNotification(notification: NonNullable<AdminNotificationList["items"]>[number]) {
+    const href = getNotificationHref(notification);
+
     await markRead(notification.id);
 
-    if (notification.caseId) {
+    if (href) {
       setIsOpen(false);
-      router.push(`/admin/cases/${notification.caseId}`);
+      router.push(href);
     }
   }
 

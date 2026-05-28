@@ -7,21 +7,13 @@ const maxSubmissionNumberLength = 100;
 const unsafeTextPattern =
   /(token|tokenHash|plaintextToken|signedUrl|storagePath|storageBucket|originalFileName|passport|residenceCard|https?:\/\/|x-amz-signature)/i;
 
-const allowedTransitions: Record<CasePhase, CasePhase[]> = {
-  draft: ["collecting_documents"],
-  collecting_documents: ["preparing_application"],
-  preparing_application: ["submitted", "collecting_documents"],
-  submitted: ["under_review", "preparing_application"],
-  under_review: ["approved", "submitted", "collecting_documents"],
-  approved: [],
-};
-
-const rollbackTransitions = new Set([
-  "preparing_application->collecting_documents",
-  "submitted->preparing_application",
-  "under_review->submitted",
-  "under_review->collecting_documents",
-]);
+const casePhases: CasePhase[] = [
+  "draft",
+  "collecting_documents",
+  "preparing_application",
+  "submitted",
+  "approved",
+];
 
 export type CasePhaseWarning = {
   type: "required_requirements_incomplete";
@@ -35,7 +27,6 @@ export type ChangeCasePhaseInput = {
   submittedAt?: Date;
   submissionNumber?: string;
   resultAt?: Date;
-  allowWithWarnings?: boolean;
 };
 
 export type ChangeCasePhaseResult = {
@@ -100,17 +91,13 @@ function normalizeSafeText(input: {
   return normalized;
 }
 
-function transitionKey(oldPhase: CasePhase, newPhase: CasePhase) {
-  return `${oldPhase}->${newPhase}`;
-}
-
-function assertAllowedTransition(oldPhase: CasePhase, newPhase: CasePhase, reason?: string) {
-  if (!allowedTransitions[oldPhase].includes(newPhase)) {
+function assertAllowedTransition(oldPhase: CasePhase, newPhase: CasePhase) {
+  if (!casePhases.includes(newPhase)) {
     throw new InvalidCasePhaseTransitionError();
   }
 
-  if (rollbackTransitions.has(transitionKey(oldPhase, newPhase)) && !reason) {
-    throw new InvalidCasePhaseTransitionError("Rollback phase changes require a reason.");
+  if (oldPhase === newPhase) {
+    throw new InvalidCasePhaseTransitionError("Please choose a different case phase.");
   }
 }
 
@@ -169,7 +156,7 @@ export async function changeCasePhase(
       throw new CasePhaseAccessError();
     }
 
-    assertAllowedTransition(visaCase.casePhase, input.newPhase, reason);
+    assertAllowedTransition(visaCase.casePhase, input.newPhase);
 
     const warnings: CasePhaseWarning[] = [];
 

@@ -70,7 +70,6 @@ const casePhases: CasePhase[] = [
   "collecting_documents",
   "preparing_application",
   "submitted",
-  "under_review",
   "approved",
 ];
 

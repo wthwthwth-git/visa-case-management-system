@@ -28,6 +28,24 @@ function optionalString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+function parseOptionalDate(value: unknown): Date | undefined | "invalid" {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return "invalid";
+  }
+
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+    return "invalid";
+  }
+
+  return parsed;
+}
+
 type RouteResponsibleParty = "customer" | "office";
 
 function parseResponsibleParty(value: unknown): RouteResponsibleParty | undefined {
@@ -47,8 +65,9 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
     const { caseId } = await context.params;
     const body = await readJsonBody(request);
     const responsibleParty = parseResponsibleParty(body.responsibleParty);
+    const dueDate = parseOptionalDate(body.dueDate);
 
-    if (typeof body.title !== "string" || !responsibleParty) {
+    if (typeof body.title !== "string" || !responsibleParty || dueDate === "invalid") {
       return jsonError("INVALID_REQUEST");
     }
 
@@ -57,6 +76,7 @@ export async function POST(request: Request, context: RouteContext): Promise<Res
       title: body.title,
       responsibleParty,
       customerInstruction: optionalString(body.customerInstruction),
+      dueDate,
     });
 
     return jsonData(requirement);

@@ -355,3 +355,16 @@ This checklist is used for manual and automated acceptance after each phase. It 
 - [ ] Admin header notification dropdown displays recent unread notifications.
 - [ ] Clicking a case-related notification can navigate to the corresponding case.
 - [ ] V1 does not send customer email, LINE, WeChat, browser push, or scheduled reminders.
+
+## 24. Stability QA Acceptance
+
+- [ ] `docs/stability-rules.md` records current phase, status, visibility, token link, due date, and file deletion rules.
+- [ ] Public E2E smoke verifies invalid Portal token safety.
+- [ ] Public E2E smoke verifies Admin pages redirect to login.
+- [ ] Authenticated Admin E2E smoke can run with `E2E_ADMIN_STORAGE_STATE`.
+- [ ] Mobile Portal E2E smoke verifies no horizontal overflow and no forbidden fields.
+- [ ] QA cleanup script defaults to dry-run.
+- [ ] QA cleanup execution requires `CLEANUP_TEST_DATA=1`.
+- [ ] File deletion removes or hides DB file rows and attempts Storage deletion.
+- [ ] Timeline metadata for file deletion remains safe.
+- [ ] Plaintext Portal token is never recoverable after the create/regenerate modal is closed.

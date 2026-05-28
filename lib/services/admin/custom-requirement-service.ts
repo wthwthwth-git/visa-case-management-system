@@ -25,6 +25,7 @@ export type AddCustomRequirementInput = {
   title: string;
   responsibleParty: ResponsibleParty;
   customerInstruction?: string;
+  dueDate?: Date;
 };
 
 export type CustomRequirementDTO = {
@@ -37,6 +38,7 @@ export type CustomRequirementDTO = {
   portalVisible: boolean;
   portalDownloadable: boolean;
   customerInstruction: string | null;
+  dueDate: string | null;
   createdAt: string;
 };
 
@@ -97,6 +99,7 @@ function toCustomRequirementDTO(requirement: {
   portalVisible: boolean;
   portalDownloadable: boolean;
   customerInstruction: string | null;
+  dueDate: Date | null;
   createdAt: Date;
 }): CustomRequirementDTO {
   return {
@@ -109,6 +112,7 @@ function toCustomRequirementDTO(requirement: {
     portalVisible: requirement.portalVisible,
     portalDownloadable: requirement.portalDownloadable,
     customerInstruction: requirement.customerInstruction,
+    dueDate: requirement.dueDate?.toISOString() ?? null,
     createdAt: requirement.createdAt.toISOString(),
   };
 }
@@ -121,6 +125,7 @@ export async function addCustomRequirement(
   const title = normalizeTitle(input.title);
   const customerInstruction = normalizeInstruction(input.customerInstruction);
   const portalVisible = input.responsibleParty === "customer";
+  const dueDate = input.responsibleParty === "customer" ? input.dueDate : undefined;
 
   const createdRequirement = await prisma.$transaction(async (tx) => {
     const visaCase = await tx.case.findUnique({
@@ -155,6 +160,7 @@ export async function addCustomRequirement(
         sortOrder,
         portalVisible,
         portalDownloadable: false,
+        dueDate,
       },
       select: {
         id: true,
@@ -164,6 +170,7 @@ export async function addCustomRequirement(
         portalVisible: true,
         portalDownloadable: true,
         customerInstruction: true,
+        dueDate: true,
         createdAt: true,
       },
     });

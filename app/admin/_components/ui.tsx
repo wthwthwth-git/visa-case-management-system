@@ -24,9 +24,7 @@ const labelMap: Record<string, string> = {
   reuse: "复用客户",
   revoked: "已撤销",
   submitted: "已提交",
-  under_review: "审查中",
-  result_completed: "审查完了",
-  closed: "已关闭",
+    result_completed: "审查完了",
   customer: "客户",
   custom: "自定义",
   office: "事务所",
@@ -58,6 +56,18 @@ const labelMap: Record<string, string> = {
 
 export function displayLabel(value: string): string {
   return labelMap[value] ?? displayChineseText(value.replaceAll("_", " "));
+}
+
+const casePhaseLabelMap: Record<string, string> = {
+  draft: "草稿",
+  collecting_documents: "材料收集中",
+  preparing_application: "资料做成中",
+  submitted: "提交审查中",
+  approved: "审查完了",
+};
+
+export function displayCasePhaseLabel(value: string): string {
+  return casePhaseLabelMap[value] ?? displayLabel(value);
 }
 
 type DateTextInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & {
@@ -210,7 +220,15 @@ function statusTone(value: string): string {
   return "border-slate-200 bg-slate-50 text-slate-600";
 }
 
-export function StatusBadge({ value, className }: { value: string; className?: string }) {
+export function StatusBadge({
+  value,
+  className,
+  label,
+}: {
+  value: string;
+  className?: string;
+  label?: string;
+}) {
   return (
     <span
       className={cx(
@@ -219,7 +237,7 @@ export function StatusBadge({ value, className }: { value: string; className?: s
         className,
       )}
     >
-      {displayLabel(value)}
+      {label ?? displayLabel(value)}
     </span>
   );
 }
@@ -270,9 +288,11 @@ export function DataTable({
 export function ProgressStepper({
   steps,
   currentStep,
+  formatLabel,
 }: {
   steps: string[];
   currentStep: string;
+  formatLabel?: (value: string) => string;
 }) {
   const currentIndex = Math.max(0, steps.indexOf(currentStep));
 
@@ -300,7 +320,7 @@ export function ProgressStepper({
                 isCurrent ? "font-semibold text-blue-700" : "text-slate-600",
               )}
             >
-              {`Step ${index + 1}：${displayLabel(step)}`}
+              {`Step ${index + 1}：${formatLabel ? formatLabel(step) : displayLabel(step)}`}
             </div>
           </div>
         );
@@ -321,9 +341,22 @@ function formatEventSummary(value: string) {
     "portal token revoked.": "客户访问链接已撤销。",
     "previous portal token revoked during regeneration.": "旧客户访问链接已在重新生成时撤销。",
     "internal note created.": "内部备注已创建。",
+    "internal note updated.": "内部备注已更新。",
+    "internal note cleared.": "内部备注已清空。",
+    "file uploaded.": "文件已上传。",
     "document file uploaded.": "文件已上传。",
+    "file removed.": "文件已删除。",
+    "requirement submitted.": "客户已提交资料。",
+    "requirement submission withdrawn.": "客户已撤回资料。",
+    "office requirement confirmed by client.": "客户已确认事务所资料。",
+    "client requested office requirement revision.": "客户要求修改事务所资料。",
     "requirement status changed.": "材料状态已变更。",
     "case phase changed.": "案件阶段已变更。",
+    "application confirmation created.": "申请书确认已创建。",
+    "application confirmation version created.": "申请书确认版本已创建。",
+    "application confirmation completed.": "申请书确认已完成。",
+    "application confirmation status changed.": "申请书确认状态已变更。",
+    "immigration additional requirement created.": "入管追加材料已创建。",
   };
 
   return summaryMap[normalized] ?? displayChineseText(value);

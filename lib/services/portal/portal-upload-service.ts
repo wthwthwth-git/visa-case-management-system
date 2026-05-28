@@ -158,7 +158,7 @@ export async function uploadPortalDocumentFile(
           caseId: tokenContext.caseId,
           eventType: "file_uploaded",
           actorType: uploadedByType,
-          summary: "File uploaded.",
+          summary: "文件已上传",
           targetType: "document_file",
           targetId: createdFile.id,
           metadata: {
@@ -336,7 +336,7 @@ export async function submitPortalDocumentRequirement(
         caseId: tokenContext.caseId,
         eventType: "requirement_status_changed",
         actorType: "client",
-        summary: "Requirement submitted.",
+        summary: "客户已提交资料",
         targetType: "case_document_requirement",
         targetId: requirement.id,
         metadata: {
@@ -463,7 +463,7 @@ export async function withdrawPortalDocumentRequirementSubmission(
         caseId: tokenContext.caseId,
         eventType: "requirement_status_changed",
         actorType: "client",
-        summary: "Requirement submission withdrawn.",
+        summary: "客户已撤回资料",
         targetType: "case_document_requirement",
         targetId: requirement.id,
         metadata: {
@@ -553,7 +553,7 @@ export async function confirmPortalOfficeRequirement(
         caseId: tokenContext.caseId,
         eventType: "requirement_status_changed",
         actorType: "client",
-        summary: "Office requirement confirmed by client.",
+        summary: "客户已确认事务所资料",
         targetType: "case_document_requirement",
         targetId: requirement.id,
         metadata: {
@@ -652,7 +652,7 @@ export async function requestPortalOfficeRequirementRevision(
         caseId: tokenContext.caseId,
         eventType: "requirement_status_changed",
         actorType: "client",
-        summary: "Client requested office requirement revision.",
+        summary: "客户要求修改事务所资料",
         targetType: "case_document_requirement",
         targetId: requirement.id,
         metadata: {

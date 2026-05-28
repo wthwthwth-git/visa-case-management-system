@@ -42,7 +42,9 @@ describe("PATCH /api/admin/requirements/[requirementId]/note", () => {
       id: "requirement-id",
       caseId: "case-id",
       title: "Passport",
+      customerInstruction: "Customer note",
       internalNote: "Admin note",
+      dueDate: "2026-06-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z",
     });
   });
@@ -53,7 +55,9 @@ describe("PATCH /api/admin/requirements/[requirementId]/note", () => {
       body: JSON.stringify({
         caseId: "case-id",
         requirementId: "body-requirement-id",
+        customerInstruction: "Customer note",
         internalNote: "Admin note",
+        dueDate: "2026-06-01",
         storagePath: "cases/file.pdf",
         tokenHash: "do-not-pass",
         signedUrl: "https://example.test/signed",
@@ -76,7 +80,9 @@ describe("PATCH /api/admin/requirements/[requirementId]/note", () => {
     expect(mocks.updateRequirementInternalNote).toHaveBeenCalledWith({
       caseId: "case-id",
       requirementId: "route-requirement-id",
+      customerInstruction: "Customer note",
       internalNote: "Admin note",
+      dueDate: new Date("2026-06-01T00:00:00.000Z"),
     });
     expect(JSON.stringify(mocks.updateRequirementInternalNote.mock.calls[0][0])).not.toContain(
       "body-requirement-id",
@@ -87,7 +93,9 @@ describe("PATCH /api/admin/requirements/[requirementId]/note", () => {
     expect(JSON.stringify(mocks.updateRequirementInternalNote.mock.calls[0][0])).not.toContain(
       "tokenHash",
     );
+    expect(payload.data.customerInstruction).toBe("Customer note");
     expect(payload.data.internalNote).toBe("Admin note");
+    expect(payload.data.dueDate).toBe("2026-06-01T00:00:00.000Z");
   });
 
   it("returns INVALID_REQUEST when caseId is missing", async () => {
@@ -96,6 +104,26 @@ describe("PATCH /api/admin/requirements/[requirementId]/note", () => {
         method: "PATCH",
         body: JSON.stringify({
           internalNote: "Admin note",
+        }),
+      }),
+      {
+        params: Promise.resolve({ requirementId: "route-requirement-id" }),
+      },
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload.error.code).toBe("INVALID_REQUEST");
+    expect(mocks.updateRequirementInternalNote).not.toHaveBeenCalled();
+  });
+
+  it("returns INVALID_REQUEST when dueDate is invalid", async () => {
+    const response = await PATCH(
+      new Request("http://localhost/api/admin/requirements/route-requirement-id/note", {
+        method: "PATCH",
+        body: JSON.stringify({
+          caseId: "case-id",
+          dueDate: "2026-02-30",
         }),
       }),
       {

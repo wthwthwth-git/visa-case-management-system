@@ -1367,3 +1367,33 @@ Customer update DTO must not include:
 - raw request metadata.
 
 Portal customer data remains read-only from the customer side in V1.
+
+## 21. Stability Addendum: Visibility, Token Links, and File Deletion
+
+Status rules are frozen in `docs/stability-rules.md`.
+
+Portal visibility:
+
+- Portal services must return DTOs, not Prisma objects.
+- Portal normal DTOs must not include internal note, storage path, storage bucket, token hash, plaintext token, raw metadata, actor/operator info, or signed URL.
+- Portal may display safe file display names returned by DTOs.
+- Signed URL is only allowed from dedicated signed URL APIs and must never include raw storage fields.
+
+Admin visibility:
+
+- Admin services may expose internal office fields through Admin DTOs when needed.
+- Admin UI should not display raw storage paths, token hashes, signed URLs, or secret values.
+- Internal notes are Admin-only and must not be copied into Portal DTOs.
+
+Portal token links:
+
+- Plaintext Portal token is only available in the create/regenerate success response.
+- The system must not attempt to reconstruct a Portal link from `tokenHash`.
+- A future "copy latest link" action can only copy the in-memory success result before the modal is closed.
+
+File deletion:
+
+- V1 file deletion should delete the Storage object where possible, not only soft-hide the DB row.
+- DB records must no longer appear in Admin/Portal file lists after deletion.
+- Timeline metadata for deletion must not contain storage path, bucket, signed URL, token, or token hash.
+- If Storage deletion fails, show a safe error and keep storage details server-side only.

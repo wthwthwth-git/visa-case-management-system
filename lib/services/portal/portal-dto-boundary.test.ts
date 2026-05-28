@@ -122,6 +122,44 @@ describe("portal DTO boundary", () => {
     expect(payload).not.toContain("originalFileName");
   });
 
+  it("maps safe submission info without exposing raw timeline metadata", () => {
+    const source = {
+      id: "case-id",
+      caseNumber: "SEED-CASE-001",
+      targetVisaType: "Seed Target Visa",
+      casePhase: "submitted" as const,
+      customer: {
+        name: "Seed Test Customer",
+      },
+      documentRequirements: [],
+      applicationConfirmations: [],
+      timelineEvents: [
+        {
+          eventType: "case_phase_changed" as const,
+          metadata: {
+            submittedAt: "2026-05-20T00:00:00.000Z",
+            submissionNumber: "SUB-001",
+            storagePath: leakedValue,
+            tokenHash: leakedValue,
+          },
+          createdAt: new Date("2026-05-20T00:00:00.000Z"),
+        },
+      ],
+    };
+
+    const dto = toPortalCaseDTO(source);
+    const payload = JSON.stringify(dto);
+
+    expect(dto.submissionInfo).toEqual({
+      submittedAt: "2026-05-20T00:00:00.000Z",
+      submissionNumber: "SUB-001",
+    });
+    expect(payload).not.toContain(leakedValue);
+    expect(payload).not.toContain("metadata");
+    expect(payload).not.toContain("storagePath");
+    expect(payload).not.toContain("tokenHash");
+  });
+
   it("lets clients download files they uploaded without exposing raw storage fields", () => {
     const source = {
       id: "requirement-id",

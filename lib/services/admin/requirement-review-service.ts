@@ -10,7 +10,7 @@ const allowedTransitions: Record<RequirementStatus, RequirementStatus[]> = {
   not_submitted: ["submitted", "not_applicable"],
   submitted: ["needs_more", "approved", "not_applicable"],
   needs_more: ["submitted", "approved", "not_applicable"],
-  approved: ["needs_more", "not_applicable"],
+  approved: ["submitted", "needs_more", "not_applicable"],
   not_applicable: ["submitted", "needs_more", "approved"],
 };
 

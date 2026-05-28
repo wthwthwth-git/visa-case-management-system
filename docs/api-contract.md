@@ -2355,3 +2355,28 @@ Response forbidden fields:
 - signed URL
 - `storagePath` / `storageBucket`
 - raw Prisma objects.
+
+## Stability Addendum: E2E, Cleanup, and File Safety
+
+Additional QA scripts:
+
+- `npm run test:e2e`: public and optional authenticated Playwright smoke tests.
+- `E2E_ADMIN_STORAGE_STATE=... npm run test:e2e`: enables logged-in Admin click flow.
+- `E2E_CASE_ID=... npm run test:e2e`: enables specific Admin case detail smoke.
+- `E2E_PORTAL_TOKEN=... npm run test:e2e`: enables valid mobile Portal smoke.
+- `npm run qa:cleanup-test-data -- --dry-run`: previews removable QA/E2E data.
+- `CLEANUP_TEST_DATA=1 npm run qa:cleanup-test-data -- --execute`: deletes only clearly prefixed QA/E2E data.
+
+File deletion contract:
+
+- Delete the Storage object when possible.
+- Remove or hide the `DocumentFile` record from Admin and Portal file lists.
+- Write safe timeline metadata only.
+- Do not expose `storagePath`, `storageBucket`, signed URL, token, or token hash in API responses.
+
+Portal link contract:
+
+- Plaintext Portal token is shown only once on create/regenerate.
+- The database only stores `tokenHash`.
+- A future copy button may only copy the temporary plaintext link while it is still in the current UI state.
+- If the temporary value is gone, the correct operation is regenerate, not recover.

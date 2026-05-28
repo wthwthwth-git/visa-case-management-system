@@ -13,7 +13,7 @@ export const rateLimitPolicies: Record<RateLimitRouteGroup, RateLimitPolicy> = {
   },
   portal_upload: {
     routeGroup: "portal_upload",
-    limit: 20,
+    limit: 120,
     windowSeconds: 600,
   },
   portal_confirmation: {

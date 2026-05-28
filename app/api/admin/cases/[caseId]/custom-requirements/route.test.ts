@@ -48,6 +48,7 @@ describe("admin custom requirement route", () => {
       portalVisible: true,
       portalDownloadable: false,
       customerInstruction: "Please upload.",
+      dueDate: "2026-06-01T00:00:00.000Z",
       createdAt: "2026-01-01T00:00:00.000Z",
     });
   });
@@ -58,6 +59,7 @@ describe("admin custom requirement route", () => {
         title: "Custom item",
         responsibleParty: "customer",
         customerInstruction: "Please upload.",
+        dueDate: "2026-06-01",
         sourceType: "template",
         tokenHash: "ignored",
         storagePath: "ignored",
@@ -78,6 +80,7 @@ describe("admin custom requirement route", () => {
       title: "Custom item",
       responsibleParty: "customer",
       customerInstruction: "Please upload.",
+      dueDate: new Date("2026-06-01T00:00:00.000Z"),
     });
     expect(JSON.stringify(mocks.addCustomRequirement.mock.calls[0][0])).not.toContain("tokenHash");
     expect(JSON.stringify(mocks.addCustomRequirement.mock.calls[0][0])).not.toContain(
@@ -89,6 +92,22 @@ describe("admin custom requirement route", () => {
     const response = await POST(createRequest({ title: "", responsibleParty: "admin" }), {
       params: Promise.resolve({ caseId: "case-route" }),
     });
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload.error.code).toBe("INVALID_REQUEST");
+    expect(mocks.addCustomRequirement).not.toHaveBeenCalled();
+  });
+
+  it("returns INVALID_REQUEST for invalid dueDate", async () => {
+    const response = await POST(
+      createRequest({
+        title: "Custom item",
+        responsibleParty: "customer",
+        dueDate: "2026-02-30",
+      }),
+      { params: Promise.resolve({ caseId: "case-route" }) },
+    );
     const payload = await response.json();
 
     expect(response.status).toBe(400);

@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test": "vitest run --exclude \"**/*.integration.test.ts\" --exclude \"e2e/**\"",
+    "test:e2e": "playwright test",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:ui": "playwright test --ui",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings=0",
@@ -16,6 +19,7 @@
     "prisma:validate": "prisma validate",
     "seed": "tsx prisma/seed.ts",
     "templates:import": "tsx prisma/import-visa-templates.ts",
+    "qa:cleanup-test-data": "tsx prisma/cleanup-test-data.ts",
     "test:token-constraint": "tsx prisma/test-token-constraint.ts"
   },
   "dependencies": {
@@ -33,6 +37,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.60.0",
     "@types/node": "^25.9.1",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",

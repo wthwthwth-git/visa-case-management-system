@@ -423,7 +423,7 @@ describe("portal upload service", () => {
         },
       }),
     );
-    expect(statusTimelineArg?.summary).toBe("Requirement submission withdrawn.");
+    expect(statusTimelineArg?.summary).toBe("客户已撤回资料");
     expect(statusTimelineArg?.metadata).toEqual({
       requirementId,
       oldStatus: "submitted",
@@ -509,7 +509,7 @@ describe("portal upload service", () => {
     expect(timelineArg).toMatchObject({
       eventType: "requirement_status_changed",
       actorType: "client",
-      summary: "Office requirement confirmed by client.",
+      summary: "客户已确认事务所资料",
       targetType: "case_document_requirement",
       targetId: requirementId,
     });

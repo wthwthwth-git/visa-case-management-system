@@ -229,7 +229,8 @@ export async function applyDocumentTemplateToCase(
         data: {
           caseId,
           title: item.title,
-          customerInstruction: item.customerInstruction,
+          customerInstruction:
+            item.responsibleParty === "office" ? null : item.customerInstruction,
           internalNote: null,
           isRequired: item.isRequired,
           responsibleParty: item.responsibleParty,

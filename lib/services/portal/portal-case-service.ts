@@ -38,8 +38,50 @@ export async function getPortalCaseByToken(token: string): Promise<PortalCaseDTO
       applicationConfirmations: {
         orderBy: [{ title: "asc" }, { version: "desc" }],
       },
+      timelineEvents: {
+        where: {
+          eventType: "case_phase_changed",
+        },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+      },
     },
   });
 
-  return toPortalCaseDTO(visaCase);
+  const templateItemIds = Array.from(
+    new Set(
+      visaCase.documentRequirements
+        .filter(
+          (requirement) =>
+            requirement.responsibleParty === "office" &&
+            requirement.sourceType === "template" &&
+            requirement.sourceTemplateItemId,
+        )
+        .map((requirement) => requirement.sourceTemplateItemId as string),
+    ),
+  );
+
+  const templateItems = templateItemIds.length
+    ? await prisma.documentTemplateItem.findMany({
+        where: { id: { in: templateItemIds } },
+        select: {
+          id: true,
+          customerInstruction: true,
+        },
+      })
+    : [];
+
+  const templateInstructionByItemId = new Map(
+    templateItems.map((item) => [item.id, item.customerInstruction]),
+  );
+
+  return toPortalCaseDTO({
+    ...visaCase,
+    documentRequirements: visaCase.documentRequirements.map((requirement) => ({
+      ...requirement,
+      sourceTemplateItemCustomerInstruction: requirement.sourceTemplateItemId
+        ? (templateInstructionByItemId.get(requirement.sourceTemplateItemId) ?? null)
+        : null,
+    })),
+  });
 }

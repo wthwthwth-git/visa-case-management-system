@@ -58,7 +58,6 @@ describe("PATCH /api/admin/cases/[caseId]/phase", () => {
       submittedAt: "2026-01-01T00:00:00.000Z",
       submissionNumber: "SUB-001",
       resultAt: "2026-02-01T00:00:00.000Z",
-      allowWithWarnings: true,
       casePhase: "approved",
       oldPhase: "draft",
       warnings: [{ type: "do-not-pass", count: 999 }],
@@ -88,7 +87,6 @@ describe("PATCH /api/admin/cases/[caseId]/phase", () => {
       submittedAt: new Date("2026-01-01T00:00:00.000Z"),
       submissionNumber: "SUB-001",
       resultAt: new Date("2026-02-01T00:00:00.000Z"),
-      allowWithWarnings: true,
     });
     expect(JSON.stringify(serviceArg)).not.toContain("body-case-id");
     expect(JSON.stringify(serviceArg)).not.toContain("dueDate");

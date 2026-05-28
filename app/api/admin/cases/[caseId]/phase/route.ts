@@ -16,7 +16,6 @@ type RouteCasePhase =
   | "collecting_documents"
   | "preparing_application"
   | "submitted"
-  | "under_review"
   | "approved";
 
 const casePhases: RouteCasePhase[] = [
@@ -24,7 +23,6 @@ const casePhases: RouteCasePhase[] = [
   "collecting_documents",
   "preparing_application",
   "submitted",
-  "under_review",
   "approved",
 ];
 
@@ -43,10 +41,6 @@ async function readJsonBody(request: Request): Promise<Record<string, unknown>> 
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
-}
-
-function optionalBoolean(value: unknown): boolean | undefined {
-  return typeof value === "boolean" ? value : undefined;
 }
 
 function parseCasePhase(value: unknown): RouteCasePhase | undefined {
@@ -99,7 +93,6 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Re
       submittedAt,
       submissionNumber: optionalString(body.submissionNumber),
       resultAt,
-      allowWithWarnings: optionalBoolean(body.allowWithWarnings),
     });
 
     return jsonData(result);

@@ -68,7 +68,7 @@ describe("immigration additional requirement service", () => {
     mocks.transaction.mockImplementation(async (callback) => callback(mocks.tx));
     mocks.tx.case.findUnique.mockResolvedValue({
       id: caseId,
-      casePhase: "under_review",
+      casePhase: "submitted",
     });
     mocks.tx.case.update.mockResolvedValue({});
     mocks.tx.caseDocumentRequirement.create.mockImplementation(async ({ data }) =>
@@ -217,7 +217,7 @@ describe("immigration additional requirement service", () => {
       targetType: "case",
       targetId: caseId,
       metadata: {
-        oldPhase: "under_review",
+        oldPhase: "submitted",
         newPhase: "collecting_documents",
         reason: "immigration request",
       },

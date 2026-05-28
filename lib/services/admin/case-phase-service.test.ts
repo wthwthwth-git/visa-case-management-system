@@ -131,33 +131,32 @@ describe("case phase service", () => {
     });
   });
 
-  it("changes submitted to under_review without creating requirements", async () => {
+  it("changes submitted to approved without creating requirements", async () => {
     mockCurrentPhase("submitted");
 
     const result = await changeCasePhase({
       caseId,
-      newPhase: "under_review",
+      newPhase: "approved",
     });
 
-    expect(result.newPhase).toBe("under_review");
+    expect(result.newPhase).toBe("approved");
     expect(mocks.tx.caseDocumentRequirement.create).not.toHaveBeenCalled();
   });
 
-  it("allows under_review to return to collecting_documents with a reason", async () => {
-    mockCurrentPhase("under_review");
+  it("allows submitted to return to collecting_documents without requiring a reason", async () => {
+    mockCurrentPhase("submitted");
 
     const result = await changeCasePhase({
       caseId,
       newPhase: "collecting_documents",
-      reason: "additional documents requested",
     });
 
-    expect(result.oldPhase).toBe("under_review");
+    expect(result.oldPhase).toBe("submitted");
     expect(result.newPhase).toBe("collecting_documents");
   });
 
-  it("records resultAt and reason for under_review to approved", async () => {
-    mockCurrentPhase("under_review");
+  it("records resultAt and reason for submitted to approved", async () => {
+    mockCurrentPhase("submitted");
     const resultAt = new Date("2026-03-01T00:00:00.000Z");
 
     await changeCasePhase({
@@ -169,15 +168,51 @@ describe("case phase service", () => {
     const timelineMetadata = mocks.tx.timelineEvent.create.mock.calls[0][0].data.metadata;
 
     expect(timelineMetadata).toEqual({
-      oldPhase: "under_review",
+      oldPhase: "submitted",
       newPhase: "approved",
       reason: "result received",
       resultAt: resultAt.toISOString(),
     });
   });
 
-  it("rejects changing approved to submitted", async () => {
+  it("allows approved to move back to submitted", async () => {
     mockCurrentPhase("approved");
+
+    const result = await changeCasePhase({
+      caseId,
+      newPhase: "submitted",
+    });
+
+    expect(result.oldPhase).toBe("approved");
+    expect(result.newPhase).toBe("submitted");
+  });
+
+  it("allows rollback without reason", async () => {
+    mockCurrentPhase("submitted");
+
+    const result = await changeCasePhase({
+      caseId,
+      newPhase: "preparing_application",
+    });
+
+    expect(result.oldPhase).toBe("submitted");
+    expect(result.newPhase).toBe("preparing_application");
+  });
+
+  it("allows draft to approved", async () => {
+    mockCurrentPhase("draft");
+
+    const result = await changeCasePhase({
+      caseId,
+      newPhase: "approved",
+    });
+
+    expect(result.oldPhase).toBe("draft");
+    expect(result.newPhase).toBe("approved");
+  });
+
+  it("rejects changing to the current phase", async () => {
+    mockCurrentPhase("submitted");
 
     await expect(
       changeCasePhase({
@@ -187,40 +222,6 @@ describe("case phase service", () => {
     ).rejects.toBeInstanceOf(InvalidCasePhaseTransitionError);
     expect(mocks.tx.case.update).not.toHaveBeenCalled();
     expect(mocks.tx.timelineEvent.create).not.toHaveBeenCalled();
-  });
-
-  it("rejects rollback without reason", async () => {
-    mockCurrentPhase("submitted");
-
-    await expect(
-      changeCasePhase({
-        caseId,
-        newPhase: "preparing_application",
-      }),
-    ).rejects.toBeInstanceOf(InvalidCasePhaseTransitionError);
-    expect(mocks.tx.case.update).not.toHaveBeenCalled();
-  });
-
-  it("rejects draft to approved", async () => {
-    mockCurrentPhase("draft");
-
-    await expect(
-      changeCasePhase({
-        caseId,
-        newPhase: "approved",
-      }),
-    ).rejects.toBeInstanceOf(InvalidCasePhaseTransitionError);
-  });
-
-  it("rejects submitted to collecting_documents", async () => {
-    mockCurrentPhase("submitted");
-
-    await expect(
-      changeCasePhase({
-        caseId,
-        newPhase: "collecting_documents",
-      }),
-    ).rejects.toBeInstanceOf(InvalidCasePhaseTransitionError);
   });
 
   it("writes timeline metadata with only allowed keys", async () => {

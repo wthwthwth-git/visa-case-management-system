@@ -20,6 +20,7 @@ export type PortalRequirement = {
   id: string;
   title: string;
   customerInstruction: string | null;
+  dueDate?: string | null;
   isRequired: boolean;
   responsibleParty: "customer" | "office";
   clientStatus: PortalDocumentStatus;
@@ -52,6 +53,10 @@ export type PortalCase = {
   customerName: string;
   targetVisaType: string;
   casePhase: string;
+  submissionInfo?: {
+    submittedAt: string | null;
+    submissionNumber: string | null;
+  } | null;
   requirements: PortalRequirement[];
   applicationConfirmations: PortalApplicationConfirmation[];
 };
@@ -345,4 +350,22 @@ export function formatPortalDateTime(value: string | null): string {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+export function formatPortalDate(value: string | null): string {
+  if (!value) {
+    return "-";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
 }

@@ -22,12 +22,23 @@ const statusLabels: Record<string, string> = {
   draft: "草稿",
   collecting_documents: "材料收集中",
   preparing_application: "资料做成中",
-  under_review: "审查中",
+  approved: "审查完了",
+};
+
+const casePhaseLabels: Record<string, string> = {
+  draft: "草稿",
+  collecting_documents: "材料收集中",
+  preparing_application: "资料做成中",
+  submitted: "提交审查中",
   approved: "审查完了",
 };
 
 export function displayPortalLabel(value: string): string {
   return statusLabels[value] ?? displayChineseText(value.replaceAll("_", " "));
+}
+
+export function displayPortalCasePhaseLabel(value: string): string {
+  return casePhaseLabels[value] ?? displayPortalLabel(value);
 }
 
 function statusTone(value: string): string {
@@ -49,7 +60,7 @@ function statusTone(value: string): string {
     return "border-rose-200 bg-rose-50 text-rose-700";
   }
 
-  if (value === "submitted" || value === "under_review" || value === "office_in_progress") {
+  if (value === "submitted" || value === "office_in_progress") {
     return "border-blue-200 bg-blue-50 text-blue-700";
   }
 

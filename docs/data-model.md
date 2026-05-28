@@ -421,7 +421,6 @@ draft
 collecting_documents
 preparing_application
 submitted
-under_review
 approved
 ```
 
