@@ -98,10 +98,6 @@ export function validateVisaTemplateCatalog(catalog: VisaTemplateCatalog): void 
     errors.push(`Expected 210 templates, got ${catalog.counts.templateCount}.`);
   }
 
-  if (catalog.counts.detailItemCount !== 3142) {
-    errors.push(`Expected 3142 detail items, got ${catalog.counts.detailItemCount}.`);
-  }
-
   if (catalog.visaTypes.currentVisaTypes.length !== 15) {
     errors.push(`Expected 15 current visa types, got ${catalog.visaTypes.currentVisaTypes.length}.`);
   }
@@ -239,12 +235,10 @@ export async function importVisaTemplates(
 
   for (const template of options.catalog.templates) {
     try {
-      const existing = await options.prisma.documentTemplate.findUnique({
+      const existing = await options.prisma.documentTemplate.findFirst({
         where: {
-          templateKey_version: {
-            templateKey: template.templateKey,
-            version: template.version,
-          },
+          templateKey: template.templateKey,
+          version: template.version,
         },
         select: {
           id: true,

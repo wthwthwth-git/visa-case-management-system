@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LanguageSwitcher } from "@/app/_components/language-switcher";
+import { useLanguage } from "@/app/_components/language-provider";
 import { displayChineseText } from "@/app/_lib/chinese-display";
 import {
   confirmPortalApplicationConfirmation,
@@ -118,6 +120,7 @@ function getRequirementSummary(requirements: PortalRequirement[]) {
 }
 
 export function PortalPage({ token }: PortalPageProps) {
+  const { locale, t } = useLanguage();
   const [portalCase, setPortalCase] = useState<PortalCase | null>(null);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState<string | null>(null);
@@ -144,7 +147,7 @@ export function PortalPage({ token }: PortalPageProps) {
       }
     } catch (error) {
       if (mountedRef.current) {
-        setPageError(toPortalErrorMessage(error));
+        setPageError(toPortalErrorMessage(error, locale));
         setPortalCase(null);
       }
     } finally {
@@ -152,7 +155,7 @@ export function PortalPage({ token }: PortalPageProps) {
         setLoading(false);
       }
     }
-  }, [token]);
+  }, [locale, token]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -203,7 +206,7 @@ export function PortalPage({ token }: PortalPageProps) {
   async function handleUpload(requirement: PortalRequirement, selectedFiles: File[]) {
     if (selectedFiles.length === 0) {
       setRequirementUploadState(requirement.id, {
-        error: "请选择需要上传的文件。",
+        error: t("portal.error.fileRequired"),
       });
       return;
     }
@@ -222,7 +225,7 @@ export function PortalPage({ token }: PortalPageProps) {
         });
       }
 
-      setNotice(`已上传 ${selectedFiles.length} 个文件。`);
+      setNotice(t("portal.notice.uploadedCount", { count: selectedFiles.length }));
       setRequirementUploadState(requirement.id, {
         files: [],
         busy: false,
@@ -232,7 +235,7 @@ export function PortalPage({ token }: PortalPageProps) {
     } catch (error) {
       setRequirementUploadState(requirement.id, {
         busy: false,
-        error: toPortalErrorMessage(error),
+        error: toPortalErrorMessage(error, locale),
       });
     }
   }
@@ -247,12 +250,12 @@ export function PortalPage({ token }: PortalPageProps) {
         token,
         requirementId: requirement.id,
       });
-      setNotice("资料已提交。");
+      setNotice(t("portal.notice.submitted"));
       await loadCase();
     } catch (error) {
       setActionErrorById((current) => ({
         ...current,
-        [actionId]: toPortalErrorMessage(error),
+        [actionId]: toPortalErrorMessage(error, locale),
       }));
     } finally {
       setBusyActionId(null);
@@ -269,13 +272,13 @@ export function PortalPage({ token }: PortalPageProps) {
         token,
         requirementId: requirement.id,
       });
-      setNotice("资料已撤回，可以继续修改。");
+      setNotice(t("portal.notice.withdrawn"));
       setDialogState(null);
       await loadCase();
     } catch (error) {
       setActionErrorById((current) => ({
         ...current,
-        [actionId]: toPortalErrorMessage(error),
+        [actionId]: toPortalErrorMessage(error, locale),
       }));
     } finally {
       setBusyActionId(null);
@@ -294,12 +297,12 @@ export function PortalPage({ token }: PortalPageProps) {
         requirementId: requirement.id,
         fileId,
       });
-      setNotice("文件已删除。");
+      setNotice(t("portal.notice.fileDeleted"));
       await loadCase();
     } catch (error) {
       setActionErrorById((current) => ({
         ...current,
-        [actionId]: toPortalErrorMessage(error),
+        [actionId]: toPortalErrorMessage(error, locale),
       }));
     } finally {
       setBusyActionId(null);
@@ -317,7 +320,7 @@ export function PortalPage({ token }: PortalPageProps) {
     } catch (error) {
       setActionErrorById((current) => ({
         ...current,
-        [actionId]: toPortalErrorMessage(error),
+        [actionId]: toPortalErrorMessage(error, locale),
       }));
     } finally {
       setBusyActionId(null);
@@ -338,7 +341,7 @@ export function PortalPage({ token }: PortalPageProps) {
     } catch (error) {
       setActionErrorById((current) => ({
         ...current,
-        [actionId]: toPortalErrorMessage(error),
+        [actionId]: toPortalErrorMessage(error, locale),
       }));
     } finally {
       setBusyActionId(null);
@@ -355,13 +358,13 @@ export function PortalPage({ token }: PortalPageProps) {
         token,
         confirmationId: confirmation.id,
       });
-      setNotice("已确认完成资料。");
+      setNotice(t("portal.notice.officeConfirmed"));
       setDialogState(null);
       await loadCase();
     } catch (error) {
       setActionErrorById((current) => ({
         ...current,
-        [actionId]: toPortalErrorMessage(error),
+        [actionId]: toPortalErrorMessage(error, locale),
       }));
     } finally {
       setBusyActionId(null);
@@ -375,7 +378,7 @@ export function PortalPage({ token }: PortalPageProps) {
     if (!comment) {
       setActionErrorById((current) => ({
         ...current,
-        [actionId]: "请填写需要事务所确认或调整的内容。",
+        [actionId]: t("portal.error.commentRequired"),
       }));
       return;
     }
@@ -390,13 +393,13 @@ export function PortalPage({ token }: PortalPageProps) {
         reason: "客户要求修改事务所资料",
       });
       setRevisionCommentById((current) => ({ ...current, [confirmation.id]: "" }));
-      setNotice("修改请求已提交。");
+      setNotice(t("portal.notice.officeRevisionRequested"));
       setDialogState(null);
       await loadCase();
     } catch (error) {
       setActionErrorById((current) => ({
         ...current,
-        [actionId]: toPortalErrorMessage(error),
+        [actionId]: toPortalErrorMessage(error, locale),
       }));
     } finally {
       setBusyActionId(null);
@@ -413,12 +416,12 @@ export function PortalPage({ token }: PortalPageProps) {
         token,
         requirementId: requirement.id,
       });
-      setNotice("已确认事务所资料。");
+      setNotice(t("portal.notice.officeRequirementConfirmed"));
       await loadCase();
     } catch (error) {
       setActionErrorById((current) => ({
         ...current,
-        [actionId]: toPortalErrorMessage(error),
+        [actionId]: toPortalErrorMessage(error, locale),
       }));
     } finally {
       setBusyActionId(null);
@@ -432,7 +435,7 @@ export function PortalPage({ token }: PortalPageProps) {
     if (!comment) {
       setActionErrorById((current) => ({
         ...current,
-        [actionId]: "请填写需要事务所确认或调整的内容。",
+        [actionId]: t("portal.error.commentRequired"),
       }));
       return;
     }
@@ -446,12 +449,12 @@ export function PortalPage({ token }: PortalPageProps) {
         comment,
       });
       setOfficeRevisionCommentById((current) => ({ ...current, [requirement.id]: "" }));
-      setNotice("修改请求已提交。");
+      setNotice(t("portal.notice.officeRevisionRequested"));
       await loadCase();
     } catch (error) {
       setActionErrorById((current) => ({
         ...current,
-        [actionId]: toPortalErrorMessage(error),
+        [actionId]: toPortalErrorMessage(error, locale),
       }));
     } finally {
       setBusyActionId(null);
@@ -466,8 +469,8 @@ export function PortalPage({ token }: PortalPageProps) {
             <div className="flex items-center gap-3">
               <span className="h-5 w-5 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
               <div>
-                <div className="font-semibold">资料加载中</div>
-                <p className="mt-1 text-sm text-slate-500">请稍候。</p>
+                <div className="font-semibold">{t("portal.loading.title")}</div>
+                <p className="mt-1 text-sm text-slate-500">{t("portal.loading.short")}</p>
               </div>
             </div>
           </PortalCard>
@@ -481,10 +484,13 @@ export function PortalPage({ token }: PortalPageProps) {
       <main className="min-h-screen bg-slate-50 px-4 py-6 text-slate-950">
         <div className="mx-auto max-w-3xl">
           <PortalCard>
-            <p className="text-sm font-semibold text-blue-600">客户资料提交页面</p>
-            <h1 className="mt-3 text-2xl font-bold">链接无效或已过期</h1>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <p className="text-sm font-semibold text-blue-600">{t("portal.eyebrow")}</p>
+              <LanguageSwitcher compact />
+            </div>
+            <h1 className="mt-3 text-2xl font-bold">{t("portal.invalid.title")}</h1>
             <p className="mt-3 leading-7 text-slate-600">
-              {pageError ?? "此链接无法继续使用，请联系事务所。"}
+              {pageError ?? t("portal.invalid.description")}
             </p>
           </PortalCard>
         </div>
@@ -495,6 +501,10 @@ export function PortalPage({ token }: PortalPageProps) {
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-4 text-slate-950 sm:py-8">
       <div className="mx-auto grid max-w-4xl gap-4 sm:gap-5">
+        <div className="flex justify-end">
+          <LanguageSwitcher compact />
+        </div>
+
         <SuccessMessage message={notice} />
 
         <PortalCaseProgress portalCase={portalCase} />
@@ -503,7 +513,7 @@ export function PortalPage({ token }: PortalPageProps) {
 
         <PortalCard>
           <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="text-lg font-bold">完成资料确认</h2>
+            <h2 className="text-lg font-bold">{t("portal.confirmations.title")}</h2>
           </div>
           {portalCase.applicationConfirmations.length > 0 || officeRequirements.length > 0 ? (
             <div className="grid gap-3">
@@ -529,7 +539,7 @@ export function PortalPage({ token }: PortalPageProps) {
                     if (!comment) {
                       setActionErrorById((current) => ({
                         ...current,
-                        [actionId]: "请填写需要事务所确认或调整的内容。",
+                        [actionId]: t("portal.error.commentRequired"),
                       }));
                       return;
                     }
@@ -560,27 +570,32 @@ export function PortalPage({ token }: PortalPageProps) {
             </div>
           ) : (
             <div className="rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-500">
-              暂无需要确认的事务所资料。
+              {t("portal.confirmations.empty")}
             </div>
           )}
         </PortalCard>
 
         <PortalCard>
           <div className="mb-4">
-            <h2 className="text-lg font-bold">提交资料</h2>
+            <h2 className="text-lg font-bold">{t("portal.requirements.title")}</h2>
           </div>
 
           {customerRequirements.length === 0 ? (
-            <EmptyState title="暂无需要提交的资料" description="目前没有客户需要提交的资料。" />
+            <EmptyState
+              title={t("portal.requirements.empty")}
+              description={t("portal.requirements.emptyDescription")}
+            />
           ) : (
             <div className="grid gap-6">
               {requirementGroups.map((group) => (
                 <section key={group.status} className="grid gap-3">
                   <div className="flex items-center justify-between gap-3">
                     <h3 className="text-sm font-semibold text-slate-500">
-                      {groupTitle(group.status)}
+                      {groupTitle(group.status, locale)}
                     </h3>
-                    <span className="text-xs text-slate-400">{group.items.length} 项</span>
+                    <span className="text-xs text-slate-400">
+                      {t("portal.requirements.count", { count: group.items.length })}
+                    </span>
                   </div>
                   {group.items.map((requirement) => (
                     <RequirementCard
@@ -643,6 +658,7 @@ function RequirementProgressSummary({
 }: {
   summary: ReturnType<typeof getRequirementSummary>;
 }) {
+  const { t } = useLanguage();
   const preparedCount = summary.submitted + summary.completed;
   const percent = summary.total > 0 ? Math.round((preparedCount / summary.total) * 100) : 0;
 
@@ -650,9 +666,9 @@ function RequirementProgressSummary({
     <PortalCard className="p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold">资料准备情况</h2>
+          <h2 className="text-lg font-bold">{t("portal.summary.title")}</h2>
           <p className="mt-2 text-sm text-slate-500">
-            已准备 {preparedCount} / {summary.total} 项
+            {t("portal.summary.prepared", { prepared: preparedCount, total: summary.total })}
           </p>
         </div>
         <div className="text-2xl font-bold text-blue-700">{percent}%</div>
@@ -666,11 +682,11 @@ function RequirementProgressSummary({
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2 text-sm sm:grid-cols-5">
-        <ProgressCount label="待提交" value={summary.pending} />
-        <ProgressCount label="需补充" value={summary.needsMore} />
-        <ProgressCount label="需修改" value={summary.needsRevision} />
-        <ProgressCount label="已提交" value={summary.submitted} />
-        <ProgressCount label="事务所已确认" value={summary.completed} />
+        <ProgressCount label={t("portal.summary.pending")} value={summary.pending} />
+        <ProgressCount label={t("portal.summary.needsMore")} value={summary.needsMore} />
+        <ProgressCount label={t("portal.summary.needsRevision")} value={summary.needsRevision} />
+        <ProgressCount label={t("portal.summary.submitted")} value={summary.submitted} />
+        <ProgressCount label={t("portal.summary.completed")} value={summary.completed} />
       </div>
 
     </PortalCard>
@@ -678,6 +694,7 @@ function RequirementProgressSummary({
 }
 
 function PortalCaseProgress({ portalCase }: { portalCase: PortalCase }) {
+  const { locale, t } = useLanguage();
   const currentPhase = normalizePortalCasePhase(portalCase.casePhase);
   const phaseIndex = portalCasePhaseSteps.indexOf(currentPhase);
   const currentIndex = phaseIndex >= 0 ? phaseIndex : 0;
@@ -691,7 +708,9 @@ function PortalCaseProgress({ portalCase }: { portalCase: PortalCase }) {
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="break-words text-2xl font-bold">
-            {displayChineseText(portalCase.customerName)} 様
+            {t("portal.customerDisplay", {
+              name: displayChineseText(portalCase.customerName),
+            })}
           </h1>
         </div>
       </div>
@@ -733,7 +752,7 @@ function PortalCaseProgress({ portalCase }: { portalCase: PortalCase }) {
                         : "text-center text-xs font-medium text-slate-500"
                     }
                   >
-                    {displayPortalCasePhaseLabel(phase)}
+                    {displayPortalCasePhaseLabel(phase, locale)}
                   </div>
                 </div>
               );
@@ -746,15 +765,15 @@ function PortalCaseProgress({ portalCase }: { portalCase: PortalCase }) {
         <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 rounded-2xl bg-slate-50 px-4 py-3 text-sm">
           {portalCase.submissionInfo.submittedAt ? (
             <div>
-              <span className="text-slate-500">提交日期：</span>
+              <span className="text-slate-500">{t("portal.submission.submittedAt")}</span>
               <span className="font-semibold text-slate-950">
-                {formatPortalDate(portalCase.submissionInfo.submittedAt)}
+                {formatPortalDate(portalCase.submissionInfo.submittedAt, locale)}
               </span>
             </div>
           ) : null}
           {portalCase.submissionInfo.submissionNumber ? (
             <div>
-              <span className="text-slate-500">受理号：</span>
+              <span className="text-slate-500">{t("portal.submission.number")}</span>
               <span className="break-words font-semibold text-slate-950">
                 {portalCase.submissionInfo.submissionNumber}
               </span>
@@ -782,18 +801,24 @@ function ProgressCount({
 }
 
 function RequirementSourceBadge({ sourceType }: { sourceType: string }) {
+  const { t } = useLanguage();
+
   if (sourceType !== "immigration_request") {
     return null;
   }
 
   return (
     <span className="inline-flex shrink-0 items-center rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
-      入管追加材料
+      {t("portal.additionalRequest")}
     </span>
   );
 }
 
-function getRequirementDueDateNotice(requirement: PortalRequirement) {
+function getRequirementDueDateNotice(
+  requirement: PortalRequirement,
+  locale: ReturnType<typeof useLanguage>["locale"],
+  t: ReturnType<typeof useLanguage>["t"],
+) {
   if (requirement.clientStatus !== "not_submitted" || !requirement.dueDate) {
     return null;
   }
@@ -812,32 +837,32 @@ function getRequirementDueDateNotice(requirement: PortalRequirement) {
   const daysUntilDue = Math.ceil(
     (dueDay.getTime() - today.getTime()) / (24 * 60 * 60 * 1000),
   );
-  const formattedDate = formatPortalDate(requirement.dueDate);
+  const formattedDate = formatPortalDate(requirement.dueDate, locale);
 
   if (daysUntilDue < 0) {
     return {
       tone: "urgent" as const,
-      label: `已超过截止日期：${formattedDate}`,
+      label: t("portal.dueDate.overdue", { date: formattedDate }),
     };
   }
 
   if (daysUntilDue === 0) {
     return {
       tone: "urgent" as const,
-      label: `今天截止：${formattedDate}`,
+      label: t("portal.dueDate.today", { date: formattedDate }),
     };
   }
 
   if (daysUntilDue < 7) {
     return {
       tone: "urgent" as const,
-      label: `截止日期：${formattedDate}（剩余${daysUntilDue}天）`,
+      label: t("portal.dueDate.soon", { date: formattedDate, days: daysUntilDue }),
     };
   }
 
   return {
     tone: "normal" as const,
-    label: `截止日期：${formattedDate}`,
+    label: t("portal.dueDate.normal", { date: formattedDate }),
   };
 }
 
@@ -862,6 +887,7 @@ function RequirementCard({
   onFileAccess: (fileId: string) => void;
   onFileDelete: (file: PortalFile) => void;
 }) {
+  const { locale, t } = useLanguage();
   const uploadBusy = uploadState?.busy ?? false;
   const submitActionId = `requirement-submit:${requirement.id}`;
   const withdrawActionId = `requirement-withdraw:${requirement.id}`;
@@ -879,7 +905,7 @@ function RequirementCard({
     (requirement.clientStatus === "not_submitted" ||
       requirement.clientStatus === "needs_more" ||
       requirement.clientStatus === "not_applicable");
-  const dueDateNotice = getRequirementDueDateNotice(requirement);
+  const dueDateNotice = getRequirementDueDateNotice(requirement, locale, t);
   const articleClassName =
     dueDateNotice?.tone === "urgent"
       ? "rounded-3xl border border-rose-200 bg-rose-50/70 p-4 shadow-sm shadow-rose-100"
@@ -914,7 +940,9 @@ function RequirementCard({
 
       {shouldShowCustomerInstruction ? (
         <div className="mt-3 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-          <div className="mb-1 text-xs font-semibold text-amber-700">说明</div>
+          <div className="mb-1 text-xs font-semibold text-amber-700">
+            {t("portal.instruction")}
+          </div>
           <div className="whitespace-pre-wrap break-words">
             {displayChineseText(requirement.customerInstruction)}
           </div>
@@ -938,7 +966,7 @@ function RequirementCard({
                       onClick={() => onFileAccess(file.id)}
                       className="min-w-0 flex-1 truncate text-left font-medium text-slate-900 hover:text-blue-700 disabled:cursor-wait disabled:opacity-60"
                     >
-                      {busyActionId === actionId ? "正在打开..." : displayName}
+                      {busyActionId === actionId ? t("portal.files.opening") : displayName}
                     </button>
                   ) : (
                     <span className="min-w-0 flex-1 truncate font-medium text-slate-700">
@@ -950,7 +978,7 @@ function RequirementCard({
                       type="button"
                       disabled={busyActionId === deleteActionId}
                       onClick={() => onFileDelete(file)}
-                      aria-label={`删除 ${displayName}`}
+                      aria-label={t("portal.files.delete", { name: displayName })}
                       className="shrink-0 px-1 text-lg leading-none text-rose-500 transition hover:text-rose-700 disabled:text-slate-300"
                     >
                       {"×"}
@@ -983,7 +1011,7 @@ function RequirementCard({
                     }
                   }}
                 />
-                {uploadBusy ? "上传中" : "上传文件"}
+                {uploadBusy ? t("portal.actions.uploading") : t("portal.actions.upload")}
               </label>
 
               {canSubmit ? (
@@ -993,7 +1021,7 @@ function RequirementCard({
                   onClick={onSubmit}
                   className="w-full sm:w-fit"
                 >
-                  {submitBusy ? "提交中" : "提交材料"}
+                  {submitBusy ? t("portal.actions.submitting") : t("portal.actions.submit")}
                 </PortalButton>
               ) : null}
             </div>
@@ -1005,14 +1033,14 @@ function RequirementCard({
 
         {!canEditFiles && requirement.clientStatus === "submitted" ? (
           <div className="flex flex-col gap-3 rounded-2xl bg-slate-50 p-3 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-            <span>{"资料已提交，事务所确认中。"}</span>
+            <span>{t("portal.requirements.inReview")}</span>
             <PortalButton
               variant="secondary"
               disabled={withdrawBusy}
               onClick={onWithdraw}
               className="w-full sm:w-fit"
             >
-              {withdrawBusy ? "撤回中" : "撤回"}
+              {withdrawBusy ? t("portal.actions.withdrawing") : t("portal.actions.withdraw")}
             </PortalButton>
           </div>
         ) : null}
@@ -1020,8 +1048,8 @@ function RequirementCard({
         {requirement.clientStatus === "accepted" ? (
           <p className="rounded-2xl bg-emerald-50 p-3 text-sm text-emerald-700">
             {isCustomerRequirement
-              ? "资料已确认。"
-              : "事务所已完成此资料，请点击文件名查看。"}
+              ? t("portal.requirements.accepted")
+              : t("portal.requirements.officeReady")}
           </p>
         ) : null}
       </div>
@@ -1048,6 +1076,7 @@ function OfficeRequirementConfirmationCard({
   onConfirm: () => void;
   onRequestRevision: () => void;
 }) {
+  const { t } = useLanguage();
   const isCompleted = requirement.clientStatus === "accepted";
   const isConfirmed = requirement.clientStatus === "not_applicable";
   const confirmActionId = `office-confirm:${requirement.id}`;
@@ -1071,7 +1100,9 @@ function OfficeRequirementConfirmationCard({
 
       {requirement.customerInstruction?.trim() ? (
         <div className="mt-3 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-          <div className="mb-1 text-xs font-semibold text-amber-700">说明</div>
+          <div className="mb-1 text-xs font-semibold text-amber-700">
+            {t("portal.instruction")}
+          </div>
           <div className="whitespace-pre-wrap break-words">
             {displayChineseText(requirement.customerInstruction)}
           </div>
@@ -1093,7 +1124,7 @@ function OfficeRequirementConfirmationCard({
                     onClick={() => onFileAccess(file.id)}
                     className="block w-full truncate text-left text-sm font-medium text-slate-900 hover:text-blue-700 disabled:cursor-wait disabled:opacity-60"
                   >
-                    {busyActionId === actionId ? "正在打开..." : displayName}
+                    {busyActionId === actionId ? t("portal.files.opening") : displayName}
                   </button>
                 ) : (
                   <span className="block truncate text-sm font-medium text-slate-700">
@@ -1112,7 +1143,7 @@ function OfficeRequirementConfirmationCard({
           <AutoGrowTextarea
             value={comment}
             onChange={onCommentChange}
-            placeholder="如需修改，请填写希望事务所确认或调整的内容。"
+            placeholder={t("portal.dialog.officeRevisionPlaceholder")}
             disabled={busyActionId === revisionActionId}
           />
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -1122,14 +1153,18 @@ function OfficeRequirementConfirmationCard({
               onClick={onRequestRevision}
               className="w-full sm:w-fit"
             >
-              {busyActionId === revisionActionId ? "提交中" : "要求修改"}
+              {busyActionId === revisionActionId
+                ? t("portal.actions.submitting")
+                : t("portal.actions.requestRevision")}
             </PortalButton>
             <PortalButton
               disabled={busyActionId === confirmActionId}
               onClick={onConfirm}
               className="w-full sm:w-fit"
             >
-              {busyActionId === confirmActionId ? "提交中" : "确认无误"}
+              {busyActionId === confirmActionId
+                ? t("portal.actions.submitting")
+                : t("portal.actions.confirmOk")}
             </PortalButton>
           </div>
           <InlineError message={actionErrorById[confirmActionId] ?? null} />
@@ -1137,11 +1172,11 @@ function OfficeRequirementConfirmationCard({
         </div>
       ) : isConfirmed ? (
         <p className="mt-4 rounded-2xl bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-700">
-          已确认此资料。
+          {t("portal.confirmations.completedMessage")}
         </p>
       ) : (
         <p className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm leading-6 text-slate-500">
-          事务所正在制作此资料。
+          {t("portal.confirmations.workingMessage")}
         </p>
       )}
 
@@ -1173,6 +1208,7 @@ function ConfirmationCard({
   onConfirm: () => void;
   onRequestRevision: () => void;
 }) {
+  const { t } = useLanguage();
   const downloadActionId = `confirmation-download:${confirmation.id}`;
   const confirmActionId = `confirmation-confirm:${confirmation.id}`;
   const revisionActionId = `confirmation-revision:${confirmation.id}`;
@@ -1187,7 +1223,9 @@ function ConfirmationCard({
           <h4 className="break-words text-base font-semibold text-slate-950">
             {displayChineseText(confirmation.title)}
           </h4>
-          <p className="mt-1 text-sm text-slate-500">版本 {confirmation.version}</p>
+          <p className="mt-1 text-sm text-slate-500">
+            {t("portal.confirmations.version", { version: confirmation.version })}
+          </p>
         </div>
         <StatusBadge value={confirmation.status} />
       </div>
@@ -1200,9 +1238,11 @@ function ConfirmationCard({
           className="flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-950 transition hover:border-blue-200 hover:text-blue-700 disabled:cursor-wait disabled:opacity-60"
         >
           <span className="min-w-0 truncate">
-            {busyActionId === downloadActionId ? "正在打开..." : displayFileName}
+            {busyActionId === downloadActionId ? t("portal.files.opening") : displayFileName}
           </span>
-          <span className="shrink-0 text-xs font-medium text-slate-400">下载</span>
+          <span className="shrink-0 text-xs font-medium text-slate-400">
+            {t("portal.files.download")}
+          </span>
         </button>
         <InlineError message={actionErrorById[downloadActionId] ?? null} />
 
@@ -1211,7 +1251,7 @@ function ConfirmationCard({
             <AutoGrowTextarea
               value={comment}
               onChange={onCommentChange}
-              placeholder="如需修改，请填写希望事务所确认或调整的内容。"
+              placeholder={t("portal.dialog.officeRevisionPlaceholder")}
               disabled={busyActionId === revisionActionId}
             />
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -1221,14 +1261,16 @@ function ConfirmationCard({
                 onClick={onRequestRevision}
                 className="w-full sm:w-fit"
               >
-                要求修改
+                {t("portal.actions.requestRevision")}
               </PortalButton>
               <PortalButton
                 disabled={busyActionId === confirmActionId}
                 onClick={onConfirm}
                 className="w-full sm:w-fit"
               >
-                {busyActionId === confirmActionId ? "提交中" : "确认无误"}
+                {busyActionId === confirmActionId
+                  ? t("portal.actions.submitting")
+                  : t("portal.actions.confirmOk")}
               </PortalButton>
             </div>
             <InlineError message={actionErrorById[confirmActionId] ?? null} />
@@ -1236,7 +1278,7 @@ function ConfirmationCard({
           </>
         ) : (
           <p className="text-sm leading-6 text-slate-500">
-            此确认资料暂不可操作。
+            {t("portal.confirmations.unavailable")}
           </p>
         )}
       </div>
@@ -1294,6 +1336,7 @@ function WithdrawRequirementDialog({
   onClose: () => void;
   onConfirm: () => void;
 }) {
+  const { t } = useLanguage();
   const actionId = `requirement-withdraw:${requirement.id}`;
   const busy = busyActionId === actionId;
 
@@ -1302,7 +1345,7 @@ function WithdrawRequirementDialog({
       <div className="relative w-full max-w-lg rounded-3xl bg-white p-5 shadow-2xl">
         <button
           type="button"
-          aria-label="关闭"
+          aria-label={t("portal.actions.close")}
           disabled={busy}
           onClick={onClose}
           className="absolute right-5 top-5 flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-xl leading-none text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50"
@@ -1311,15 +1354,17 @@ function WithdrawRequirementDialog({
         </button>
         <div className="pr-12">
           <div>
-            <h2 className="text-xl font-bold">撤回已提交资料</h2>
+            <h2 className="text-xl font-bold">{t("portal.dialog.withdrawTitle")}</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              撤回后可以继续修改或删除已上传文件，确认无误后请再次提交资料。
+              {t("portal.dialog.withdrawDescription")}
             </p>
           </div>
         </div>
 
         <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <div className="text-xs font-semibold text-slate-500">资料名称</div>
+          <div className="text-xs font-semibold text-slate-500">
+            {t("portal.dialog.requirementName")}
+          </div>
           <p className="mt-2 break-words text-sm font-semibold text-slate-900">
             {displayChineseText(requirement.title)}
           </p>
@@ -1329,10 +1374,10 @@ function WithdrawRequirementDialog({
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <PortalButton variant="secondary" disabled={busy} onClick={onClose}>
-            取消
+            {t("portal.actions.cancel")}
           </PortalButton>
           <PortalButton disabled={busy} onClick={onConfirm}>
-            {busy ? "撤回中" : "确认撤回"}
+            {busy ? t("portal.actions.withdrawing") : t("portal.actions.confirmWithdraw")}
           </PortalButton>
         </div>
       </div>
@@ -1357,6 +1402,7 @@ function ConfirmationDialog({
   onConfirm: () => void;
   onRequestRevision: () => void;
 }) {
+  const { t } = useLanguage();
   const confirmActionId = `confirmation-confirm:${state.confirmation.id}`;
   const revisionActionId = `confirmation-revision:${state.confirmation.id}`;
   const isRevision = state.kind === "revision";
@@ -1370,7 +1416,7 @@ function ConfirmationDialog({
       <div className="relative w-full max-w-lg rounded-3xl bg-white p-5 shadow-2xl">
         <button
           type="button"
-          aria-label="关闭"
+          aria-label={t("portal.actions.close")}
           disabled={busy}
           onClick={onClose}
           className="absolute right-5 top-5 flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-xl leading-none text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50"
@@ -1380,19 +1426,23 @@ function ConfirmationDialog({
         <div className="pr-12">
           <div>
             <h2 className="text-xl font-bold">
-              {isRevision ? "要求修改完成资料" : "确认完成资料"}
+              {isRevision
+                ? t("portal.dialog.officeRevisionTitle")
+                : t("portal.dialog.confirmOfficeTitle")}
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
               {isRevision
-                ? "请确认要提交给事务所的修改内容。"
-                : "确认后事务所会继续处理。如需调整，请选择要求修改。"}
+                ? t("portal.dialog.officeRevisionDescription")
+                : t("portal.dialog.confirmOfficeDescription")}
             </p>
           </div>
         </div>
 
         {isRevision ? (
           <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <div className="text-xs font-semibold text-slate-500">修改内容</div>
+            <div className="text-xs font-semibold text-slate-500">
+              {t("portal.dialog.revisionContent")}
+            </div>
             <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">
               {comment.trim()}
             </p>
@@ -1404,7 +1454,7 @@ function ConfirmationDialog({
             value={comment}
             rows={4}
             className="hidden"
-            placeholder="请填写希望事务所确认或调整的内容。"
+            placeholder={t("portal.dialog.officeRevisionPlaceholder")}
             disabled={busy}
           />
         ) : null}
@@ -1415,13 +1465,17 @@ function ConfirmationDialog({
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           <PortalButton variant="secondary" disabled={busy} onClick={onClose}>
-            取消
+            {t("portal.actions.cancel")}
           </PortalButton>
           <PortalButton
             disabled={busy}
             onClick={isRevision ? onRequestRevision : onConfirm}
           >
-            {busy ? "提交中" : isRevision ? "提交修改请求" : "确认无误"}
+            {busy
+              ? t("portal.actions.submitting")
+              : isRevision
+                ? t("portal.actions.submitRevision")
+                : t("portal.actions.confirmOk")}
           </PortalButton>
         </div>
       </div>

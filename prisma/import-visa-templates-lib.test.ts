@@ -27,13 +27,13 @@ function createMockPrisma(existingTemplateKeys = new Set<string>()) {
       },
     }),
   );
-  const findUniqueMock = vi.fn(
+  const findFirstMock = vi.fn(
     async ({
       where,
     }: {
-      where: { templateKey_version: { templateKey: string; version: number } };
+      where: { templateKey: string; version: number };
     }) => {
-      const key = `${where.templateKey_version.templateKey}:${where.templateKey_version.version}`;
+      const key = `${where.templateKey}:${where.version}`;
       if (!existingTemplateKeys.has(key)) {
         return null;
       }
@@ -49,11 +49,11 @@ function createMockPrisma(existingTemplateKeys = new Set<string>()) {
 
   return {
     createMock,
-    findUniqueMock,
+    findFirstMock,
     transactionMock,
     prisma: {
       documentTemplate: {
-        findUnique: findUniqueMock,
+        findFirst: findFirstMock,
       },
       $transaction: transactionMock,
     },
@@ -104,10 +104,10 @@ describe("importVisaTemplates", () => {
     });
 
     expect(summary.createdTemplates).toBe(210);
-    expect(summary.createdItems).toBe(3142);
+    expect(summary.createdItems).toBe(catalog.counts.detailItemCount);
     expect(summary.skippedTemplates).toBe(0);
     expect(summary.failedTemplates).toEqual([]);
-    expect(mock.findUniqueMock).toHaveBeenCalledTimes(210);
+    expect(mock.findFirstMock).toHaveBeenCalledTimes(210);
     expect(mock.transactionMock).not.toHaveBeenCalled();
     expect(mock.createMock).not.toHaveBeenCalled();
   });
@@ -139,7 +139,7 @@ describe("importVisaTemplates", () => {
     });
 
     expect(summary.createdTemplates).toBe(210);
-    expect(summary.createdItems).toBe(3142);
+    expect(summary.createdItems).toBe(catalog.counts.detailItemCount);
     expect(mock.transactionMock).toHaveBeenCalledTimes(210);
 
     const firstCreate = mock.createMock.mock.calls[0][0] as {

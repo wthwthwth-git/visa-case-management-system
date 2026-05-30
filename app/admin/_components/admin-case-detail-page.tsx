@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useLanguage } from "@/app/_components/language-provider";
 import { displayChineseText, displayVisaType } from "@/app/_lib/chinese-display";
 import {
   apiGet,
@@ -31,6 +32,132 @@ import {
 type Props = {
   caseId: string;
 };
+
+const caseDetailText = {
+  zh: {
+    back: "返回案件列表",
+    title: "案件详情",
+    deleteCase: "删除案件",
+    loadingTitle: "案件详情加载中",
+    loadingDetail: "正在读取案件、资料项和变更履历。",
+    notFoundTitle: "未找到案件",
+    notFoundDescription: "该案件可能不存在，或当前 URL 中的 caseId 不正确。请返回案件列表重新选择。",
+    customerInfo: "客户信息",
+    edit: "编辑",
+    name: "姓名",
+    email: "邮箱",
+    phone: "电话",
+    nationality: "国籍",
+    caseProgress: "案件进度",
+    changePhase: "切换阶段",
+    requirementTotal: "资料项目总数：",
+    updatedAt: "最近更新：",
+    submittedAt: "提交日期",
+    submissionNumber: "受理号",
+    note: "备注",
+    customerRequirements: "客户资料",
+    officeRequirements: "事务所资料",
+    emptyCustomerRequirements: "暂无客户负责的资料项。请确认是否已经套用模板，或通过入管追加材料添加客户补件。",
+    emptyOfficeRequirements: "暂无事务所负责的资料项。后续可通过模板或自定义资料项补充。",
+    addRequirement: "添加资料",
+    additionalRequirements: "入管追加材料 / {count} 项",
+    addAdditionalRequirement: "添加材料",
+    emptyAdditionalCustomer: "暂无客户负责的入管追加材料。",
+    emptyAdditionalOffice: "暂无事务所负责的入管追加材料。",
+    tokenTitle: "客户访问链接",
+    tokenActive: "有效",
+    tokenMissing: "未创建",
+    tokenDescription: "明文访问令牌不会保存。重新生成成功后只在弹窗中显示一次。",
+    regenerateToken: "重新生成链接",
+    revokeToken: "撤销链接",
+    timeline: "变更履历",
+    viewAllTimeline: "查看全部变更履历",
+    modalCustomer: "编辑客户信息",
+    modalOfficeReview: "事务所资料制作状态",
+    modalCustomerReview: "审核资料状态",
+    modalUpload: "上传文件",
+    modalEditNote: "修改备注",
+    modalAddNote: "添加备注",
+    modalDueDate: "设置截止日期",
+    modalAddAdditional: "添加入管追加材料",
+    modalAddAdditionalDescription: "后台手动创建，不依赖模板。",
+    modalAddCustomerRequirement: "追加客户资料",
+    modalAddOfficeRequirement: "追加事务所资料",
+    modalPhase: "切换案件阶段",
+    modalCurrentPhase: "当前阶段：{phase}",
+    modalApplicationConfirmation: "新建申请书确认版本",
+    modalApplicationConfirmationDescription: "登记已经存在于 Storage 的确认文件。",
+    modalRegenerateToken: "重新生成客户访问链接",
+    modalRegenerateTokenDescription: "旧链接会失效，新的客户访问链接只显示一次。",
+    modalRevokeToken: "撤销客户访问链接",
+    modalRevokeTokenDescription: "客户访问链接会失效，且不会返回明文访问令牌。",
+  },
+  ja: {
+    back: "案件一覧へ戻る",
+    title: "案件詳細",
+    deleteCase: "案件を削除",
+    loadingTitle: "案件詳細を読み込み中",
+    loadingDetail: "案件、資料項目、変更履歴を読み込んでいます。",
+    notFoundTitle: "案件が見つかりません",
+    notFoundDescription: "案件が存在しない、または URL の caseId が正しくない可能性があります。案件一覧に戻って選択し直してください。",
+    customerInfo: "お客様情報",
+    edit: "編集",
+    name: "氏名",
+    email: "メール",
+    phone: "電話番号",
+    nationality: "国籍",
+    caseProgress: "案件進捗",
+    changePhase: "段階を変更",
+    requirementTotal: "資料項目数：",
+    updatedAt: "最終更新：",
+    submittedAt: "提出日",
+    submissionNumber: "受付番号",
+    note: "メモ",
+    customerRequirements: "お客様資料",
+    officeRequirements: "事務所資料",
+    emptyCustomerRequirements: "お客様担当の資料項目はありません。テンプレート適用状況を確認するか、入管追加資料から補足資料を追加してください。",
+    emptyOfficeRequirements: "事務所担当の資料項目はありません。テンプレートまたは追加資料で補足できます。",
+    addRequirement: "資料を追加",
+    additionalRequirements: "入管追加資料 / {count} 件",
+    addAdditionalRequirement: "資料を追加",
+    emptyAdditionalCustomer: "お客様担当の入管追加資料はありません。",
+    emptyAdditionalOffice: "事務所担当の入管追加資料はありません。",
+    tokenTitle: "お客様リンク",
+    tokenActive: "有効",
+    tokenMissing: "未作成",
+    tokenDescription: "平文アクセストークンは保存されません。再生成後はダイアログで一度だけ表示されます。",
+    regenerateToken: "リンクを再生成",
+    revokeToken: "リンクを取り消す",
+    timeline: "変更履歴",
+    viewAllTimeline: "すべての変更履歴を見る",
+    modalCustomer: "お客様情報を編集",
+    modalOfficeReview: "事務所資料の作成状態",
+    modalCustomerReview: "資料の確認状態",
+    modalUpload: "ファイルをアップロード",
+    modalEditNote: "メモを編集",
+    modalAddNote: "メモを追加",
+    modalDueDate: "提出期限を設定",
+    modalAddAdditional: "入管追加資料を追加",
+    modalAddAdditionalDescription: "管理画面で手動作成します。テンプレートには依存しません。",
+    modalAddCustomerRequirement: "お客様資料を追加",
+    modalAddOfficeRequirement: "事務所資料を追加",
+    modalPhase: "案件段階を変更",
+    modalCurrentPhase: "現在の段階：{phase}",
+    modalApplicationConfirmation: "確認資料バージョンを新規作成",
+    modalApplicationConfirmationDescription: "Storage に既に存在する確認ファイルを登録します。",
+    modalRegenerateToken: "お客様リンクを再生成",
+    modalRegenerateTokenDescription: "旧リンクは失効し、新しいお客様リンクは一度だけ表示されます。",
+    modalRevokeToken: "お客様リンクを取り消す",
+    modalRevokeTokenDescription: "お客様リンクは失効し、平文アクセストークンは返されません。",
+  },
+} as const;
+
+function formatCaseDetailText(template: string, params: Record<string, string | number>) {
+  return Object.entries(params).reduce(
+    (current, [key, value]) => current.replaceAll(`{${key}}`, String(value)),
+    template,
+  );
+}
 
 type ApiSuccess<T> = {
   data: T;
@@ -2535,6 +2662,8 @@ function TokenRevokeForm({
 }
 
 export function AdminCaseDetailPage({ caseId }: Props) {
+  const { locale } = useLanguage();
+  const text = caseDetailText[locale];
   const router = useRouter();
   const [caseDetail, setCaseDetail] = useState<AdminCaseDetail | null>(null);
   const [requirements, setRequirements] = useState<AdminRequirement[]>([]);
@@ -2952,9 +3081,11 @@ export function AdminCaseDetailPage({ caseId }: Props) {
       <div className="mb-6 grid gap-4 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
         <div>
           <Link href="/admin/cases" className="text-sm text-blue-700 hover:underline">
-            返回案件列表
+            {text.back}
           </Link>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">案件详情</h1>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+            {text.title}
+          </h1>
         </div>
         {caseDetail ? (
           <button
@@ -2962,26 +3093,26 @@ export function AdminCaseDetailPage({ caseId }: Props) {
             onClick={requestDeleteCase}
             className="inline-flex w-fit rounded-2xl border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50"
           >
-            删除案件
+            {text.deleteCase}
           </button>
         ) : null}
       </div>
 
-      {isLoading ? <LoadingState title="案件详情加载中" detail="正在读取案件、资料项和变更履历。" /> : null}
+      {isLoading ? <LoadingState title={text.loadingTitle} detail={text.loadingDetail} /> : null}
       {message ? <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 shadow-sm">{message}</div> : null}
       {warning ? <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 shadow-sm">{warning}</div> : null}
       {error ? <ErrorBanner message={error} /> : null}
       {!isLoading && !error && !caseDetail ? (
         <DashboardCard>
           <EmptyState
-            title="未找到案件"
-            description="该案件可能不存在，或当前 URL 中的 caseId 不正确。请返回案件列表重新选择。"
+            title={text.notFoundTitle}
+            description={text.notFoundDescription}
             action={
               <Link
                 href="/admin/cases"
                 className="inline-flex rounded-2xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
               >
-                返回案件列表
+                {text.back}
               </Link>
             }
           />
@@ -2998,44 +3129,47 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                   {formatVisaBusinessSummary(caseDetail.currentVisaType, caseDetail.targetVisaType)}
                 </p>
               </div>
-              <StatusBadge value={caseDetail.casePhase} label={displayCasePhaseLabel(caseDetail.casePhase)} />
+              <StatusBadge
+                value={caseDetail.casePhase}
+                label={displayCasePhaseLabel(caseDetail.casePhase, locale)}
+              />
             </div>
           </DashboardCard>
 
           <DashboardCard>
             <SectionHeader
-              title="客户信息"
+              title={text.customerInfo}
               action={
                 <button
                   type="button"
                   onClick={() => setActiveModal({ type: "customer", customer: caseDetail.customer })}
                   className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
                 >
-                  编辑
+                  {text.edit}
                 </button>
               }
             />
             <div className="grid gap-x-10 gap-y-5 text-sm sm:grid-cols-2 xl:grid-cols-4">
               <div>
-                <div className="text-slate-500">姓名</div>
+                <div className="text-slate-500">{text.name}</div>
                 <div className="mt-1 break-words font-semibold text-slate-950">
                   {caseDetail.customer.name}
                 </div>
               </div>
               <div>
-                <div className="text-slate-500">邮箱</div>
+                <div className="text-slate-500">{text.email}</div>
                 <div className="mt-1 break-words font-semibold text-slate-950">
                   {caseDetail.customer.email ?? "-"}
                 </div>
               </div>
               <div>
-                <div className="text-slate-500">电话</div>
+                <div className="text-slate-500">{text.phone}</div>
                 <div className="mt-1 break-words font-semibold text-slate-950">
                   {caseDetail.customer.phone ?? "-"}
                 </div>
               </div>
               <div>
-                <div className="text-slate-500">国籍</div>
+                <div className="text-slate-500">{text.nationality}</div>
                 <div className="mt-1 break-words font-semibold text-slate-950">
                   {caseDetail.customer.nationality ?? "-"}
                 </div>
@@ -3047,26 +3181,26 @@ export function AdminCaseDetailPage({ caseId }: Props) {
             <div className="grid gap-6">
               <DashboardCard>
                 <SectionHeader
-                  title="案件进度"
+                  title={text.caseProgress}
                   action={
                     <button
                       type="button"
                       onClick={() => setActiveModal({ type: "phase" })}
                       className="rounded-2xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-200 hover:bg-blue-700"
                     >
-                      切换阶段
+                      {text.changePhase}
                     </button>
                   }
                 />
                 <div className="mb-5 flex flex-wrap gap-x-6 gap-y-2 border-b border-slate-100 pb-4 text-sm text-slate-600">
                   <div>
-                    资料项目总数：
+                    {text.requirementTotal}
                     <span className="font-semibold text-slate-950">
                       {caseDetail.requirementSummary.total}
                     </span>
                   </div>
                   <div>
-                    最近更新：
+                    {text.updatedAt}
                     <span className="font-semibold text-slate-950">
                       {formatDateTime(caseDetail.updatedAt)}
                     </span>
@@ -3075,14 +3209,14 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                 <ProgressStepper
                   steps={casePhaseSteps}
                   currentStep={caseDetail.casePhase}
-                  formatLabel={displayCasePhaseLabel}
+                  formatLabel={(phase) => displayCasePhaseLabel(phase, locale)}
                 />
                 {latestCaseSubmissionInfo && shouldShowSubmissionInfo(caseDetail.casePhase) ? (
                   <div className="mt-5 border-t border-slate-100 pt-4">
                     <div className="grid gap-4 text-sm sm:grid-cols-2">
                       {latestCaseSubmissionInfo.submittedAt ? (
                         <div>
-                          <div className="text-slate-500">提交日期</div>
+                          <div className="text-slate-500">{text.submittedAt}</div>
                           <div className="mt-1 font-semibold text-slate-950">
                             {formatDateOnly(latestCaseSubmissionInfo.submittedAt)}
                           </div>
@@ -3090,7 +3224,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                       ) : null}
                       {latestCaseSubmissionInfo.submissionNumber ? (
                         <div>
-                          <div className="text-slate-500">受理号</div>
+                          <div className="text-slate-500">{text.submissionNumber}</div>
                           <div className="mt-1 break-words font-semibold text-slate-950">
                             {latestCaseSubmissionInfo.submissionNumber}
                           </div>
@@ -3101,7 +3235,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                 ) : null}
                 {latestCasePhaseReason ? (
                   <div className="mt-5 border-t border-slate-100 pt-4">
-                    <div className="text-sm text-slate-500">备注</div>
+                    <div className="text-sm text-slate-500">{text.note}</div>
                     <div className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">
                       {latestCasePhaseReason}
                     </div>
@@ -3111,8 +3245,8 @@ export function AdminCaseDetailPage({ caseId }: Props) {
 
               <div className="grid gap-6">
                 <RequirementGroup
-                  title="客户资料"
-                  emptyMessage="暂无客户负责的资料项。请确认是否已经套用模板，或通过入管追加材料添加客户补件。"
+                  title={text.customerRequirements}
+                  emptyMessage={text.emptyCustomerRequirements}
                   requirements={grouped.customer}
                   collapsible
                   action={
@@ -3123,7 +3257,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                       }
                       className="rounded-2xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-200 hover:bg-blue-700"
                     >
-                      添加资料
+                      {text.addRequirement}
                     </button>
                   }
                   onReview={(requirement) => setActiveModal({ type: "review", requirement })}
@@ -3142,8 +3276,8 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                   focusedRequirementId={focusedRequirementId}
                 />
                 <RequirementGroup
-                  title="事务所资料"
-                  emptyMessage="暂无事务所负责的资料项。后续可通过模板或自定义资料项补充。"
+                  title={text.officeRequirements}
+                  emptyMessage={text.emptyOfficeRequirements}
                   requirements={grouped.office}
                   collapsible
                   action={
@@ -3154,7 +3288,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                       }
                       className="rounded-2xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-200 hover:bg-blue-700"
                     >
-                      添加资料
+                      {text.addRequirement}
                     </button>
                   }
                   onReview={(requirement) => setActiveModal({ type: "review", requirement })}
@@ -3182,7 +3316,9 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                   }
                 >
                   <h2 className="text-base font-semibold text-slate-950">
-                    入管追加材料 / {grouped.immigrationCustomer.length + grouped.immigrationOffice.length} 项
+                    {formatCaseDetailText(text.additionalRequirements, {
+                      count: grouped.immigrationCustomer.length + grouped.immigrationOffice.length,
+                    })}
                   </h2>
                   <div className="flex flex-wrap items-center gap-2">
                     <button
@@ -3190,7 +3326,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                       onClick={() => setActiveModal({ type: "immigration" })}
                       className="rounded-2xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-200 hover:bg-blue-700"
                     >
-                      添加材料
+                      {text.addAdditionalRequirement}
                     </button>
                     <CollapseIconButton
                       isExpanded={isImmigrationExpanded}
@@ -3200,8 +3336,8 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                 </div>
                 {isImmigrationExpanded ? <div className="grid gap-6">
                   <RequirementGroup
-                    title="客户资料"
-                    emptyMessage="暂无客户负责的入管追加材料。"
+                    title={text.customerRequirements}
+                    emptyMessage={text.emptyAdditionalCustomer}
                     requirements={grouped.immigrationCustomer}
                     standalone={false}
                     onReview={(requirement) => setActiveModal({ type: "review", requirement })}
@@ -3221,8 +3357,8 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                   />
                   <div className="border-t border-slate-100 pt-6">
                     <RequirementGroup
-                      title="事务所资料"
-                      emptyMessage="暂无事务所负责的入管追加材料。"
+                      title={text.officeRequirements}
+                      emptyMessage={text.emptyAdditionalOffice}
                       requirements={grouped.immigrationOffice}
                       standalone={false}
                       onReview={(requirement) => setActiveModal({ type: "review", requirement })}
@@ -3249,7 +3385,9 @@ export function AdminCaseDetailPage({ caseId }: Props) {
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-3">
-                    <h2 className="text-base font-semibold text-slate-950">客户访问链接</h2>
+                    <h2 className="text-base font-semibold text-slate-950">
+                      {text.tokenTitle}
+                    </h2>
                     <span
                       className={
                         caseDetail.tokenSummary.activeTokenCount > 0
@@ -3257,11 +3395,13 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                           : "rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-500"
                       }
                     >
-                      {caseDetail.tokenSummary.activeTokenCount > 0 ? "有效" : "未创建"}
+                      {caseDetail.tokenSummary.activeTokenCount > 0
+                        ? text.tokenActive
+                        : text.tokenMissing}
                     </span>
                   </div>
                   <p className="mt-2 text-sm leading-6 text-slate-500">
-                    明文访问令牌不会保存。重新生成成功后只在弹窗中显示一次。
+                    {text.tokenDescription}
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -3270,14 +3410,14 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                     onClick={() => setActiveModal({ type: "tokenRegenerate" })}
                     className="rounded-2xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-blue-200 hover:bg-blue-700"
                   >
-                    重新生成链接
+                    {text.regenerateToken}
                   </button>
                   <button
                     type="button"
                     onClick={() => setActiveModal({ type: "tokenRevoke" })}
                     className="rounded-2xl border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50"
                   >
-                    撤销链接
+                    {text.revokeToken}
                   </button>
                 </div>
               </div>
@@ -3287,7 +3427,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
 
           <DashboardCard className="shadow-sm">
             <SectionHeader
-              title="变更履历"
+              title={text.timeline}
               action={
                 timeline.length > 3 ? (
                   <button
@@ -3295,7 +3435,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                     onClick={() => setActiveModal({ type: "changeHistory" })}
                     className="rounded-2xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                   >
-                    查看全部变更履历
+                    {text.viewAllTimeline}
                   </button>
                 ) : null
               }
@@ -3307,7 +3447,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
 
       {activeModal?.type === "customer" ? (
         <Modal
-          title="编辑客户信息"
+          title={text.modalCustomer}
           onClose={closeActiveModal}
           closeDisabled={isModalBusy}
         >
@@ -3324,8 +3464,8 @@ export function AdminCaseDetailPage({ caseId }: Props) {
         <Modal
           title={
             activeModal.requirement.responsibleParty === "office"
-              ? "事务所资料制作状态"
-              : "审核资料状态"
+              ? text.modalOfficeReview
+              : text.modalCustomerReview
           }
           onClose={closeActiveModal}
           closeDisabled={isModalBusy}
@@ -3342,7 +3482,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
 
       {activeModal?.type === "upload" ? (
         <Modal
-          title="上传文件"
+          title={text.modalUpload}
           description={displayChineseText(activeModal.requirement.title)}
           onClose={closeActiveModal}
           closeDisabled={isModalBusy}
@@ -3359,7 +3499,11 @@ export function AdminCaseDetailPage({ caseId }: Props) {
 
       {activeModal?.type === "note" ? (
         <Modal
-          title={getVisibleRequirementInternalNote(activeModal.requirement) ? "修改备注" : "添加备注"}
+          title={
+            getVisibleRequirementInternalNote(activeModal.requirement)
+              ? text.modalEditNote
+              : text.modalAddNote
+          }
           onClose={closeActiveModal}
           closeDisabled={isModalBusy}
         >
@@ -3375,7 +3519,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
 
       {activeModal?.type === "dueDate" ? (
         <Modal
-          title="设置截止日期"
+          title={text.modalDueDate}
           onClose={closeActiveModal}
           closeDisabled={isModalBusy}
         >
@@ -3391,8 +3535,8 @@ export function AdminCaseDetailPage({ caseId }: Props) {
 
       {activeModal?.type === "immigration" ? (
         <Modal
-          title="添加入管追加材料"
-          description="后台手动创建，不依赖模板。"
+          title={text.modalAddAdditional}
+          description={text.modalAddAdditionalDescription}
           onClose={closeActiveModal}
           closeDisabled={isModalBusy}
         >
@@ -3409,8 +3553,8 @@ export function AdminCaseDetailPage({ caseId }: Props) {
         <Modal
           title={
             activeModal.responsibleParty === "customer"
-              ? "追加客户资料"
-              : "追加事务所资料"
+              ? text.modalAddCustomerRequirement
+              : text.modalAddOfficeRequirement
           }
           onClose={closeActiveModal}
           closeDisabled={isModalBusy}
@@ -3427,8 +3571,10 @@ export function AdminCaseDetailPage({ caseId }: Props) {
 
       {activeModal?.type === "phase" && caseDetail ? (
         <Modal
-          title="切换案件阶段"
-          description={`当前阶段：${displayCasePhaseLabel(caseDetail.casePhase)}`}
+          title={text.modalPhase}
+          description={formatCaseDetailText(text.modalCurrentPhase, {
+            phase: displayCasePhaseLabel(caseDetail.casePhase, locale),
+          })}
           onClose={closeActiveModal}
           closeDisabled={isModalBusy}
         >
@@ -3444,8 +3590,8 @@ export function AdminCaseDetailPage({ caseId }: Props) {
 
       {activeModal?.type === "applicationConfirmation" ? (
         <Modal
-          title="新建申请书确认版本"
-          description="登记已经存在于 Storage 的确认文件。"
+          title={text.modalApplicationConfirmation}
+          description={text.modalApplicationConfirmationDescription}
           onClose={closeActiveModal}
           closeDisabled={isModalBusy}
         >
@@ -3460,8 +3606,8 @@ export function AdminCaseDetailPage({ caseId }: Props) {
 
       {activeModal?.type === "tokenRegenerate" ? (
         <Modal
-          title="重新生成客户访问链接"
-          description="旧链接会失效，新的客户访问链接只显示一次。"
+          title={text.modalRegenerateToken}
+          description={text.modalRegenerateTokenDescription}
           onClose={closeActiveModal}
           closeDisabled={isModalBusy}
         >
@@ -3476,8 +3622,8 @@ export function AdminCaseDetailPage({ caseId }: Props) {
 
       {activeModal?.type === "tokenRevoke" ? (
         <Modal
-          title="撤销客户访问链接"
-          description="客户访问链接会失效，且不会返回明文访问令牌。"
+          title={text.modalRevokeToken}
+          description={text.modalRevokeTokenDescription}
           onClose={closeActiveModal}
           closeDisabled={isModalBusy}
         >

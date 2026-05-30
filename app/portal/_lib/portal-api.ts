@@ -1,5 +1,11 @@
 ﻿"use client";
 
+import {
+  DEFAULT_LOCALE,
+  translate,
+  type AppLocale,
+} from "@/app/_lib/i18n";
+
 export type PortalDocumentStatus =
   | "not_submitted"
   | "submitted"
@@ -310,19 +316,22 @@ function cleanOptionalString(value: string | undefined) {
   return trimmed ? trimmed : undefined;
 }
 
-export function toPortalErrorMessage(error: unknown): string {
+export function toPortalErrorMessage(
+  error: unknown,
+  locale: AppLocale = DEFAULT_LOCALE,
+): string {
   const code = error instanceof PortalApiError ? error.code : null;
   const apiMessage = error instanceof PortalApiError ? error.message.trim() : "";
 
   switch (code) {
     case "INVALID_PORTAL_TOKEN":
-      return "链接无效或已过期，请联系事务所。";
+      return translate(locale, "portal.error.invalidToken");
     case "RATE_LIMITED":
-      return "操作过于频繁，请稍后再试。";
+      return translate(locale, "portal.error.rateLimited");
     case "FILE_NOT_ACCESSIBLE":
-      return "文件暂时无法访问，请联系事务所。";
+      return translate(locale, "portal.error.fileNotAccessible");
     case "CONFIRMATION_NOT_ACCESSIBLE":
-      return "完成资料暂时无法访问，请联系事务所。";
+      return translate(locale, "portal.error.confirmationNotAccessible");
     case "INVALID_UPLOAD":
       if (
         apiMessage &&
@@ -332,27 +341,38 @@ export function toPortalErrorMessage(error: unknown): string {
         return apiMessage;
       }
 
-      return "文件格式或大小不符合要求。";
+      return translate(locale, "portal.error.invalidUpload");
     case "INVALID_REQUEST":
-      return "提交内容有误，请检查后再试。";
+      return translate(locale, "portal.error.invalidRequest");
     case "SERVER_CONFIGURATION_ERROR":
-      return "服务配置暂时不可用，请联系事务所。";
+      return translate(locale, "portal.error.serverConfiguration");
     default:
-      return "发生错误，请稍后再试或联系事务所。";
+      return translate(locale, "portal.error.generic");
   }
 }
-export function formatPortalDateTime(value: string | null): string {
+
+function localeToDateLocale(locale: AppLocale) {
+  return locale === "ja" ? "ja-JP" : "zh-CN";
+}
+
+export function formatPortalDateTime(
+  value: string | null,
+  locale: AppLocale = DEFAULT_LOCALE,
+): string {
   if (!value) {
     return "-";
   }
 
-  return new Intl.DateTimeFormat("ja-JP", {
+  return new Intl.DateTimeFormat(localeToDateLocale(locale), {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
 }
 
-export function formatPortalDate(value: string | null): string {
+export function formatPortalDate(
+  value: string | null,
+  locale: AppLocale = DEFAULT_LOCALE,
+): string {
   if (!value) {
     return "-";
   }
@@ -363,7 +383,7 @@ export function formatPortalDate(value: string | null): string {
     return value;
   }
 
-  return new Intl.DateTimeFormat("ja-JP", {
+  return new Intl.DateTimeFormat(localeToDateLocale(locale), {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",

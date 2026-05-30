@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState, type InputHTMLAttributes, type ReactNode } from "react";
+import { useLanguage } from "@/app/_components/language-provider";
 import { displayChineseText } from "@/app/_lib/chinese-display";
+import {
+  displayLocalizedCasePhaseLabel,
+  displayLocalizedLabel,
+  type AppLocale,
+} from "@/app/_lib/i18n";
 import { formatDateTime, type AdminTimelineEvent } from "../_lib/admin-api";
 
 export function cx(...classes: Array<string | false | null | undefined>) {
@@ -54,7 +60,16 @@ const labelMap: Record<string, string> = {
   application_confirmation_status_changed: "申请书确认状态已变更",
 };
 
-export function displayLabel(value: string): string {
+const localizedLabelAliases: Record<string, string> = {
+  result_completed: "approved_phase",
+};
+
+export function displayLabel(value: string, locale?: AppLocale): string {
+  const localized = displayLocalizedLabel(localizedLabelAliases[value] ?? value, locale);
+  if (localized !== displayChineseText(localizedLabelAliases[value] ?? value)) {
+    return localized;
+  }
+
   return labelMap[value] ?? displayChineseText(value.replaceAll("_", " "));
 }
 
@@ -66,8 +81,10 @@ const casePhaseLabelMap: Record<string, string> = {
   approved: "审查完了",
 };
 
-export function displayCasePhaseLabel(value: string): string {
-  return casePhaseLabelMap[value] ?? displayLabel(value);
+export function displayCasePhaseLabel(value: string, locale?: AppLocale): string {
+  return casePhaseLabelMap[value]
+    ? displayLocalizedCasePhaseLabel(value, locale)
+    : displayLabel(value, locale);
 }
 
 type DateTextInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & {
@@ -107,18 +124,22 @@ export function DashboardCard({
 }
 
 export function LoadingState({
-  title = "加载中",
+  title,
   detail,
 }: {
   title?: string;
   detail?: string;
 }) {
+  const { t } = useLanguage();
+
   return (
     <DashboardCard>
       <div className="flex items-center gap-3">
         <span className="h-4 w-4 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />
         <div>
-          <div className="text-sm font-semibold text-slate-950">{title}</div>
+          <div className="text-sm font-semibold text-slate-950">
+            {title ?? t("admin.common.loading")}
+          </div>
           {detail ? <div className="mt-1 text-sm text-slate-500">{detail}</div> : null}
         </div>
       </div>
@@ -229,6 +250,8 @@ export function StatusBadge({
   className?: string;
   label?: string;
 }) {
+  const { locale } = useLanguage();
+
   return (
     <span
       className={cx(
@@ -237,7 +260,7 @@ export function StatusBadge({
         className,
       )}
     >
-      {label ?? displayLabel(value)}
+      {label ?? displayLabel(value, locale)}
     </span>
   );
 }
@@ -294,6 +317,7 @@ export function ProgressStepper({
   currentStep: string;
   formatLabel?: (value: string) => string;
 }) {
+  const { locale } = useLanguage();
   const currentIndex = Math.max(0, steps.indexOf(currentStep));
 
   return (
@@ -320,7 +344,7 @@ export function ProgressStepper({
                 isCurrent ? "font-semibold text-blue-700" : "text-slate-600",
               )}
             >
-              {`Step ${index + 1}：${formatLabel ? formatLabel(step) : displayLabel(step)}`}
+              {`Step ${index + 1}：${formatLabel ? formatLabel(step) : displayLabel(step, locale)}`}
             </div>
           </div>
         );
@@ -363,8 +387,10 @@ function formatEventSummary(value: string) {
 }
 
 export function TimelineList({ events }: { events: AdminTimelineEvent[] }) {
+  const { t } = useLanguage();
+
   if (events.length === 0) {
-    return <p className="text-sm text-slate-500">暂无变更履历。</p>;
+    return <p className="text-sm text-slate-500">{t("admin.timeline.empty")}</p>;
   }
 
   return (
@@ -400,6 +426,7 @@ export function Modal({
   onClose: () => void;
   closeDisabled?: boolean;
 }) {
+  const { t } = useLanguage();
   const [isScrolling, setIsScrolling] = useState(false);
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -443,7 +470,7 @@ export function Modal({
             disabled={closeDisabled}
             className="rounded-full border border-slate-200 px-3 py-1 text-sm text-slate-500 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-300"
           >
-            {closeDisabled ? "处理中" : "关闭"}
+            {closeDisabled ? t("admin.common.processing") : t("admin.common.close")}
           </button>
         </div>
         {children}

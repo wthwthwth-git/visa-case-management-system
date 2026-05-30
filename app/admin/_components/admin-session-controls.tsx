@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { signOut } from "next-auth/react";
+import { useEffect, useState } from "react";
+
+import { useLanguage } from "@/app/_components/language-provider";
 
 type SessionResponse = {
   user?: {
@@ -10,7 +12,8 @@ type SessionResponse = {
 };
 
 export function AdminSessionControls() {
-  const [email, setEmail] = useState("确认登录中...");
+  const { t } = useLanguage();
+  const [email, setEmail] = useState(t("admin.session.checking"));
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
@@ -24,11 +27,11 @@ export function AdminSessionControls() {
         const session = (await response.json()) as SessionResponse;
 
         if (isMounted) {
-          setEmail(session.user?.email ?? "未登录");
+          setEmail(session.user?.email ?? t("admin.session.unknown"));
         }
       } catch {
         if (isMounted) {
-          setEmail("未登录");
+          setEmail(t("admin.session.unknown"));
         }
       }
     }
@@ -38,7 +41,7 @@ export function AdminSessionControls() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [t]);
 
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -57,7 +60,7 @@ export function AdminSessionControls() {
         }}
         className="h-10 shrink-0 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-600 shadow-sm transition hover:border-blue-200 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {isLoggingOut ? "退出中..." : "退出"}
+        {isLoggingOut ? t("admin.session.loggingOut") : t("admin.session.logout")}
       </button>
     </div>
   );

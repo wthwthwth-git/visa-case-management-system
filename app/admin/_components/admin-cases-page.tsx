@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useLanguage } from "@/app/_components/language-provider";
 import { displayVisaType } from "@/app/_lib/chinese-display";
 import { apiGet, formatDateTime, toAdminErrorMessage, type AdminCaseList } from "../_lib/admin-api";
 import {
@@ -37,6 +38,7 @@ function getVisaBusinessType(item: { currentVisaType: string; targetVisaType: st
 }
 
 export function AdminCasesPage() {
+  const { locale, t } = useLanguage();
   const [cases, setCases] = useState<AdminCaseList | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -70,7 +72,7 @@ export function AdminCasesPage() {
         }
       } catch (loadError) {
         if (isMounted) {
-          setError(toAdminErrorMessage(loadError, "案件列表加载失败。请稍后重试。"));
+          setError(toAdminErrorMessage(loadError, t("admin.cases.loadError")));
         }
       } finally {
         if (isMounted) {
@@ -84,7 +86,7 @@ export function AdminCasesPage() {
     return () => {
       isMounted = false;
     };
-  }, [activeSearch, phaseFilter]);
+  }, [activeSearch, phaseFilter, t]);
 
   const filteredItems = useMemo(() => {
     const items = cases?.items ?? [];
@@ -105,13 +107,15 @@ export function AdminCasesPage() {
     <main className="mx-auto max-w-7xl">
       <div className="mb-6 grid gap-4 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-950">案件列表</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+            {t("admin.cases.title")}
+          </h1>
         </div>
         <Link
           href="/admin/cases/new"
           className="inline-flex w-full justify-center rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-200 transition hover:bg-blue-700 sm:w-auto"
         >
-          新建案件
+          {t("admin.cases.new")}
         </Link>
       </div>
 
@@ -120,44 +124,44 @@ export function AdminCasesPage() {
             <input
               value={searchInput}
               onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="客户姓名"
+              placeholder={t("admin.cases.searchPlaceholder")}
               className="min-w-0 flex-1 border-0 bg-transparent px-3 py-2 text-sm outline-none"
             />
             <button
               type="submit"
               className="m-1 shrink-0 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-blue-700"
             >
-              检索
+              {t("admin.cases.search")}
             </button>
         </div>
           <select
-            aria-label="业务阶段"
+            aria-label={t("admin.cases.phaseFilter")}
             value={phaseFilter}
             onChange={(event) => setPhaseFilter(event.target.value)}
             className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
           >
-            <option value="all">全部阶段</option>
+            <option value="all">{t("admin.cases.allPhases")}</option>
             {casePhaseFilterOptions.map((phase) => (
               <option key={phase} value={phase}>
-                {displayCasePhaseLabel(phase)}
+                {displayCasePhaseLabel(phase, locale)}
               </option>
             ))}
           </select>
           <select
-            aria-label="签证业务类型"
+            aria-label={t("admin.cases.typeFilter")}
             value={businessTypeFilter}
             onChange={(event) => setBusinessTypeFilter(event.target.value as VisaBusinessTypeFilter)}
             className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
           >
-            <option value="all">全部类型</option>
-            <option value="certification">认定</option>
-            <option value="renewal">更新</option>
-            <option value="change">变更</option>
+            <option value="all">{t("admin.cases.allTypes")}</option>
+            <option value="certification">{t("admin.cases.certification")}</option>
+            <option value="renewal">{t("admin.cases.renewal")}</option>
+            <option value="change">{t("admin.cases.change")}</option>
           </select>
       </form>
 
       {isLoading ? (
-        <LoadingState title="案件列表加载中" detail="正在读取后台案件摘要。" />
+        <LoadingState title={t("admin.cases.loadingTitle")} detail={t("admin.cases.loadingDetail")} />
       ) : null}
 
       {error ? <ErrorBanner message={error} /> : null}
@@ -165,11 +169,15 @@ export function AdminCasesPage() {
       {!isLoading && !error && cases && filteredItems.length === 0 ? (
         <DashboardCard className="text-center">
           <EmptyState
-            title={activeSearch || phaseFilter !== "all" || businessTypeFilter !== "all" ? "没有找到匹配案件" : "暂无案件"}
+            title={
+              activeSearch || phaseFilter !== "all" || businessTypeFilter !== "all"
+                ? t("admin.cases.emptyFilteredTitle")
+                : t("admin.cases.emptyTitle")
+            }
             description={
               activeSearch || phaseFilter !== "all" || businessTypeFilter !== "all"
-                ? "可以调整客户姓名、业务阶段或签证业务类型后继续筛选。"
-                : "当前还没有案件。先创建案件，再套用模板并生成客户访问链接。"
+                ? t("admin.cases.emptyFilteredDescription")
+                : t("admin.cases.emptyDescription")
             }
             action={
               activeSearch || phaseFilter !== "all" || businessTypeFilter !== "all" ? (
@@ -179,7 +187,7 @@ export function AdminCasesPage() {
                   href="/admin/cases/new"
                   className="inline-flex rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
                 >
-                  新建案件
+                  {t("admin.cases.new")}
                 </Link>
               )
             }
@@ -188,7 +196,15 @@ export function AdminCasesPage() {
       ) : null}
 
       {cases && filteredItems.length > 0 ? (
-        <DataTable headers={["案件", "客户", "申请签证类型", "阶段", "更新时间"]}>
+        <DataTable
+          headers={[
+            t("admin.cases.column.case"),
+            t("admin.cases.column.customer"),
+            t("admin.cases.column.targetVisaType"),
+            t("admin.cases.column.phase"),
+            t("admin.cases.column.updatedAt"),
+          ]}
+        >
           {filteredItems.map((item) => (
             <tr key={item.id} className="transition hover:bg-blue-50/40">
               <td className="px-5 py-4">
@@ -205,7 +221,7 @@ export function AdminCasesPage() {
               <td className="px-5 py-4">
                 <StatusBadge
                   value={item.casePhase}
-                  label={displayCasePhaseLabel(item.casePhase)}
+                  label={displayCasePhaseLabel(item.casePhase, locale)}
                   className="min-w-24 justify-center"
                 />
               </td>

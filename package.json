@@ -19,6 +19,7 @@
     "prisma:validate": "prisma validate",
     "seed": "tsx prisma/seed.ts",
     "templates:import": "tsx prisma/import-visa-templates.ts",
+    "templates:sync": "tsx prisma/sync-visa-templates.ts",
     "qa:cleanup-test-data": "tsx prisma/cleanup-test-data.ts",
     "test:token-constraint": "tsx prisma/test-token-constraint.ts"
   },

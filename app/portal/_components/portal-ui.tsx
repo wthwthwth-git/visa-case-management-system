@@ -1,44 +1,25 @@
+"use client";
+
 import type { ButtonHTMLAttributes, ReactNode } from "react";
-import { displayChineseText } from "@/app/_lib/chinese-display";
+import { useLanguage } from "@/app/_components/language-provider";
+import {
+  displayLocalizedCasePhaseLabel,
+  displayLocalizedGroupTitle,
+  displayLocalizedLabel,
+  type AppLocale,
+} from "@/app/_lib/i18n";
 import type { PortalDocumentStatus } from "../_lib/portal-api";
 
 export function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-const statusLabels: Record<string, string> = {
-  not_submitted: "未提交",
-  needs_more: "需补充",
-  submitted: "已提交",
-  accepted: "已确认",
-  office_in_progress: "制作中",
-  office_completed: "已完成",
-  office_confirmed: "已确认",
-  not_applicable: "需修改",
-  pending: "待确认",
-  confirmed: "已确认",
-  needs_revision: "需修改",
-  superseded: "已作废",
-  draft: "草稿",
-  collecting_documents: "材料收集中",
-  preparing_application: "资料做成中",
-  approved: "审查完了",
-};
-
-const casePhaseLabels: Record<string, string> = {
-  draft: "草稿",
-  collecting_documents: "材料收集中",
-  preparing_application: "资料做成中",
-  submitted: "提交审查中",
-  approved: "审查完了",
-};
-
-export function displayPortalLabel(value: string): string {
-  return statusLabels[value] ?? displayChineseText(value.replaceAll("_", " "));
+export function displayPortalLabel(value: string, locale?: AppLocale): string {
+  return displayLocalizedLabel(value, locale);
 }
 
-export function displayPortalCasePhaseLabel(value: string): string {
-  return casePhaseLabels[value] ?? displayPortalLabel(value);
+export function displayPortalCasePhaseLabel(value: string, locale?: AppLocale): string {
+  return displayLocalizedCasePhaseLabel(value, locale);
 }
 
 function statusTone(value: string): string {
@@ -68,6 +49,8 @@ function statusTone(value: string): string {
 }
 
 export function StatusBadge({ value }: { value: string }) {
+  const { locale } = useLanguage();
+
   return (
     <span
       className={cx(
@@ -75,7 +58,7 @@ export function StatusBadge({ value }: { value: string }) {
         statusTone(value),
       )}
     >
-      {displayPortalLabel(value)}
+      {displayPortalLabel(value, locale)}
     </span>
   );
 }
@@ -161,17 +144,6 @@ export function EmptyState({ title, description }: { title: string; description:
   );
 }
 
-export function groupTitle(status: PortalDocumentStatus) {
-  switch (status) {
-    case "not_submitted":
-      return "待提交";
-    case "needs_more":
-      return "需补充";
-    case "not_applicable":
-      return "需修改";
-    case "submitted":
-      return "已提交";
-    case "accepted":
-      return "已确认";
-  }
+export function groupTitle(status: PortalDocumentStatus, locale?: AppLocale) {
+  return displayLocalizedGroupTitle(status, locale);
 }

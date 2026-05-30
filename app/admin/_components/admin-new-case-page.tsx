@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useLanguage } from "@/app/_components/language-provider";
 import { displayChineseText, displayVisaType } from "@/app/_lib/chinese-display";
+import {
+  displayVisaTemplateItemInstruction,
+  displayVisaTemplateItemTitle,
+  displayVisaTemplateTitle,
+} from "@/app/_lib/visa-template-translations";
 import {
   apiGet,
   apiPost,
@@ -75,24 +81,291 @@ const currentVisaTypes = [
 const targetVisaTypes = currentVisaTypes.filter((visaType) => visaType !== "无");
 const changeCurrentVisaTypes = targetVisaTypes;
 const todayDateValue = new Date().toISOString().slice(0, 10);
-const visaBusinessTypeOptions: Array<{ value: VisaBusinessType; label: string; description: string }> = [
-  {
-    value: "certification",
-    label: "认定",
-    description: "没有现有签证，从在留资格认定证明书开始申请。",
-  },
-  {
-    value: "renewal",
-    label: "更新",
-    description: "现有签证和申请签证相同，只选择申请签证类型。",
-  },
-  {
-    value: "change",
-    label: "变更",
-    description: "现有签证和申请签证不同，需要同时选择两种签证类型。",
-  },
-];
 const creationSteps = ["选择客户", "选择签证", "选择材料模板", "确认材料清单", "创建案件", "生成客户链接"];
+
+const newCaseText = {
+  zh: {
+    title: "新建案件",
+    progress: "建案进度",
+    createCustomer: "新建客户",
+    reuseCustomer: "复用客户",
+    stepLabels: {
+      选择客户: "选择客户",
+      选择签证: "选择签证",
+      选择材料模板: "选择材料模板",
+      确认材料清单: "确认材料清单",
+      创建案件: "创建案件",
+      生成客户链接: "生成客户链接",
+    },
+    stepTitles: {
+      customer: "Step 1：选择客户",
+      visa: "Step 2：选择签证",
+      template: "Step 3：选择材料模板",
+      checklist: "Step 4：确认材料清单",
+      create: "Step 5：创建案件",
+      token: "Step 6：生成客户链接",
+    },
+    placeholders: {
+      customerName: "客户姓名",
+      email: "邮箱",
+      phone: "电话",
+      nationality: "国籍",
+      birthday: "出生日期 YYYY-MM-DD",
+      address: "地址（可选，不会在搜索结果中显示）",
+      customerSearch: "按姓名、邮箱、电话搜索",
+      caseTitle: "案件标题（可选）",
+      internalNote: "内部备注（仅后台可见，可选）",
+      customTitle: "例如：补充说明书",
+      customerInstruction: "客户提交材料时会显示给客户，可选",
+      internalOnly: "仅后台可见，可选",
+      dueDate: "截止日期 YYYY-MM-DD",
+    },
+    labels: {
+      visaBusinessType: "签证业务类型",
+      currentVisaType: "现有签证类型",
+      targetVisaType: "申请签证类型",
+      selected: "已选择",
+      excluded: "已排除",
+      customAdded: "自定义追加",
+      customerItems: "客户提交材料",
+      officeItems: "事务所做成材料",
+      customItems: "自定义追加材料",
+      itemCount: "{count} 项",
+      customer: "客户",
+      templateAndItems: "模板与材料",
+      customerMode: "客户模式",
+      template: "模板",
+      items: "材料",
+      case: "案件",
+      token: "客户访问链接",
+      itemName: "材料名称（必填）",
+      responsibleParty: "负责方",
+      customerInstruction: "客户说明",
+      internalNote: "内部备注",
+      dueDate: "截止日期",
+      expiresAt: "有效期：",
+    },
+    actions: {
+      search: "搜索",
+      searching: "搜索中...",
+      generate: "生成材料一览",
+      generating: "生成材料一览中...",
+      addItem: "追加材料",
+      edit: "点击修改",
+      confirm: "确定",
+      delete: "删除",
+      createCase: "确认创建案件",
+      creating: "创建中...",
+      created: "案件已创建",
+      createToken: "创建客户访问链接",
+      tokenCreated: "客户访问链接已创建",
+      copyToken: "复制访问令牌",
+      openCase: "打开案件详情",
+    },
+    messages: {
+      customerSearchEmpty: "没有找到匹配客户",
+      customerSearchEmptyDescription: "可以换关键词继续搜索，或切换到“新建客户”录入新客户。",
+      templateIntro: "请选择签证业务类型和申请签证类型后生成材料一览。",
+      noTemplate: "没有匹配模板",
+      noTemplateDescription: "请检查模板状态、签证业务类型和申请签证类型。当前模板只匹配 active 状态。",
+      chooseTemplate: "请先选择模板。",
+      noItems: "没有材料",
+      noItemsDescription: "当前模板在这个分组下没有材料。",
+      noCustomItems: "还没有追加材料",
+      noCustomItemsDescription: "可追加客户提交材料或事务所做成材料。",
+      noExistingCustomer: "尚未选择已有客户",
+      noCustomerName: "尚未填写客户姓名",
+      noSelectedTemplate: "尚未选择模板",
+      createTokenAfterCase: "案件创建后可以选择创建客户访问链接。",
+      tokenOnceTitle: "明文访问令牌只显示一次。",
+      tokenOnceDescription: "离开或刷新页面后无法再次查看明文访问令牌。请立即复制，并通过安全渠道发送给客户。",
+      noFixedExpiry: "无固定过期时间",
+      notSelected: "未选择",
+      notCreated: "未创建",
+    },
+    errors: {
+      changeSameVisa: "变更业务中，现有签证类型和申请签证类型不能相同；如果相同请选择“更新”。",
+      customerSearch: "客户搜索失败，请稍后重试。",
+      templateList: "模板列表加载失败，请稍后重试。",
+      templateMissing: "模板不存在或已不可用，请重新选择。",
+      templateDetail: "模板详情加载失败，请稍后重试。",
+      customItemTitle: "请先填写必填项目：材料名称。",
+      selectCustomer: "请先选择一个已有客户。",
+      customerName: "请填写客户姓名。",
+      selectTemplate: "请先选择模板并加载材料预览。",
+      keepOneItem: "请至少保留一个模板材料，或追加一个自定义材料。",
+      createCase: "案件创建失败，请检查材料选择后重试。",
+      createTokenFirstCase: "请先创建案件，再创建客户访问链接。",
+      createToken: "客户访问链接创建失败。案件已创建，可以稍后在详情页重试。",
+      copyFailed: "复制失败，请手动复制访问令牌文本。",
+    },
+    success: {
+      caseCreated: "案件 {caseNumber} 已创建，已生成 {count} 个材料项。",
+      tokenCreated: "客户访问链接已创建。明文访问令牌只在当前界面显示一次。",
+      copied: "已复制。请只通过安全渠道发送给客户。",
+      createdSummary: "已创建：{caseNumber}，材料项 {count} 个。",
+      selectedSummary: "已选择 {selected} 项，排除 {excluded} 项，自定义 {custom} 项",
+    },
+    businessTypes: {
+      certification: {
+        label: "认定",
+        description: "没有现有签证，从在留资格认定证明书开始申请。",
+      },
+      renewal: {
+        label: "更新",
+        description: "现有签证和申请签证相同，只选择申请签证类型。",
+      },
+      change: {
+        label: "变更",
+        description: "现有签证和申请签证不同，需要同时选择两种签证类型。",
+      },
+    },
+  },
+  ja: {
+    title: "新規案件",
+    progress: "作成進捗",
+    createCustomer: "新規顧客",
+    reuseCustomer: "既存顧客を使用",
+    stepLabels: {
+      选择客户: "お客様選択",
+      选择签证: "ビザ選択",
+      选择材料模板: "資料テンプレート選択",
+      确认材料清单: "資料リスト確認",
+      创建案件: "案件作成",
+      生成客户链接: "お客様リンク発行",
+    },
+    stepTitles: {
+      customer: "Step 1：お客様選択",
+      visa: "Step 2：ビザ選択",
+      template: "Step 3：資料テンプレート選択",
+      checklist: "Step 4：資料リスト確認",
+      create: "Step 5：案件作成",
+      token: "Step 6：お客様リンク発行",
+    },
+    placeholders: {
+      customerName: "お客様名",
+      email: "メール",
+      phone: "電話番号",
+      nationality: "国籍",
+      birthday: "生年月日 YYYY-MM-DD",
+      address: "住所（任意、検索結果には表示されません）",
+      customerSearch: "氏名、メール、電話番号で検索",
+      caseTitle: "案件タイトル（任意）",
+      internalNote: "内部メモ（管理画面のみ、任意）",
+      customTitle: "例：補足説明書",
+      customerInstruction: "お客様の提出画面に表示されます（任意）",
+      internalOnly: "管理画面のみ（任意）",
+      dueDate: "提出期限 YYYY-MM-DD",
+    },
+    labels: {
+      visaBusinessType: "ビザ業務種別",
+      currentVisaType: "現在のビザ種別",
+      targetVisaType: "申請ビザ種別",
+      selected: "選択済み",
+      excluded: "除外",
+      customAdded: "追加作成",
+      customerItems: "お客様提出資料",
+      officeItems: "事務所作成資料",
+      customItems: "追加資料",
+      itemCount: "{count} 件",
+      customer: "お客様",
+      templateAndItems: "テンプレートと資料",
+      customerMode: "顧客モード",
+      template: "テンプレート",
+      items: "資料",
+      case: "案件",
+      token: "お客様リンク",
+      itemName: "資料名（必須）",
+      responsibleParty: "担当",
+      customerInstruction: "お客様向け説明",
+      internalNote: "内部メモ",
+      dueDate: "提出期限",
+      expiresAt: "有効期限：",
+    },
+    actions: {
+      search: "検索",
+      searching: "検索中...",
+      generate: "資料リストを生成",
+      generating: "生成中...",
+      addItem: "資料を追加",
+      edit: "クリックして編集",
+      confirm: "確定",
+      delete: "削除",
+      createCase: "案件を作成",
+      creating: "作成中...",
+      created: "案件作成済み",
+      createToken: "お客様リンクを作成",
+      tokenCreated: "お客様リンク作成済み",
+      copyToken: "アクセストークンをコピー",
+      openCase: "案件詳細を開く",
+    },
+    messages: {
+      customerSearchEmpty: "一致する顧客がありません",
+      customerSearchEmptyDescription: "別のキーワードで検索するか、「新規顧客」に切り替えて入力してください。",
+      templateIntro: "ビザ業務種別と申請ビザ種別を選択してから資料リストを生成してください。",
+      noTemplate: "一致するテンプレートがありません",
+      noTemplateDescription: "テンプレート状態、ビザ業務種別、申請ビザ種別を確認してください。現在は active 状態のみ対象です。",
+      chooseTemplate: "先にテンプレートを選択してください。",
+      noItems: "資料がありません",
+      noItemsDescription: "このテンプレートの該当グループには資料がありません。",
+      noCustomItems: "追加資料はまだありません",
+      noCustomItemsDescription: "お客様提出資料または事務所作成資料を追加できます。",
+      noExistingCustomer: "既存顧客が未選択です",
+      noCustomerName: "お客様名が未入力です",
+      noSelectedTemplate: "テンプレートが未選択です",
+      createTokenAfterCase: "案件作成後にお客様リンクを作成できます。",
+      tokenOnceTitle: "平文アクセストークンは一度だけ表示されます。",
+      tokenOnceDescription: "画面を離れる、または更新すると再表示できません。今すぐコピーし、安全な方法でお客様へ送付してください。",
+      noFixedExpiry: "固定の有効期限なし",
+      notSelected: "未選択",
+      notCreated: "未作成",
+    },
+    errors: {
+      changeSameVisa: "変更業務では、現在のビザ種別と申請ビザ種別を同じにできません。同じ場合は「更新」を選択してください。",
+      customerSearch: "顧客検索に失敗しました。しばらくしてから再度お試しください。",
+      templateList: "テンプレート一覧の読み込みに失敗しました。しばらくしてから再度お試しください。",
+      templateMissing: "テンプレートが存在しない、または利用できません。再度選択してください。",
+      templateDetail: "テンプレート詳細の読み込みに失敗しました。しばらくしてから再度お試しください。",
+      customItemTitle: "必須項目の資料名を入力してください。",
+      selectCustomer: "既存顧客を選択してください。",
+      customerName: "お客様名を入力してください。",
+      selectTemplate: "テンプレートを選択し、資料プレビューを読み込んでください。",
+      keepOneItem: "テンプレート資料を1件以上残すか、追加資料を1件作成してください。",
+      createCase: "案件作成に失敗しました。資料選択を確認してから再度お試しください。",
+      createTokenFirstCase: "先に案件を作成してからお客様リンクを作成してください。",
+      createToken: "お客様リンクの作成に失敗しました。案件は作成済みのため、後で詳細画面から再試行できます。",
+      copyFailed: "コピーに失敗しました。アクセストークンを手動で選択してください。",
+    },
+    success: {
+      caseCreated: "案件 {caseNumber} を作成し、資料項目 {count} 件を生成しました。",
+      tokenCreated: "お客様リンクを作成しました。平文アクセストークンはこの画面で一度だけ表示されます。",
+      copied: "コピーしました。安全な方法でのみお客様へ送付してください。",
+      createdSummary: "作成済み：{caseNumber}、資料項目 {count} 件。",
+      selectedSummary: "選択済み {selected} 件、除外 {excluded} 件、追加 {custom} 件",
+    },
+    businessTypes: {
+      certification: {
+        label: "認定",
+        description: "現在のビザがない場合。在留資格認定証明書交付申請から開始します。",
+      },
+      renewal: {
+        label: "更新",
+        description: "現在のビザと申請ビザが同じ場合。申請ビザ種別のみ選択します。",
+      },
+      change: {
+        label: "変更",
+        description: "現在のビザと申請ビザが異なる場合。両方のビザ種別を選択します。",
+      },
+    },
+  },
+} as const;
+
+function interpolate(template: string, params: Record<string, string | number>) {
+  return Object.entries(params).reduce(
+    (current, [key, value]) => current.replaceAll(`{${key}}`, String(value)),
+    template,
+  );
+}
 
 function createEmptyCustomer(): NewCustomerForm {
   return {
@@ -145,10 +418,16 @@ function groupTemplateItems(templateDetail: AdminTemplateDetail | null) {
 }
 
 function formatTemplateDisplayName(template: {
+  templateKey: string;
+  version: number;
   currentVisaType: string | null;
   targetVisaType: string | null;
   title?: string;
-}) {
+}, locale: "zh" | "ja") {
+  if (locale === "ja") {
+    return displayVisaTemplateTitle(template, locale);
+  }
+
   if (!template.currentVisaType || !template.targetVisaType) {
     return displayChineseText(template.title ?? "材料一览模板");
   }
@@ -168,6 +447,13 @@ function formatTemplateDisplayName(template: {
 }
 
 export function AdminNewCasePage() {
+  const { locale } = useLanguage();
+  const text = newCaseText[locale];
+  const visaBusinessTypeOptions = [
+    { value: "certification", ...text.businessTypes.certification },
+    { value: "renewal", ...text.businessTypes.renewal },
+    { value: "change", ...text.businessTypes.change },
+  ] satisfies Array<{ value: VisaBusinessType; label: string; description: string }>;
   const [customerMode, setCustomerMode] = useState<CustomerMode>("create");
   const [newCustomer, setNewCustomer] = useState<NewCustomerForm>(createEmptyCustomer);
   const [customerSearch, setCustomerSearch] = useState("");
@@ -237,7 +523,7 @@ export function AdminNewCasePage() {
       setCustomerResults(result.items);
       setHasSearchedCustomers(true);
     } catch (searchError) {
-      setError(toAdminErrorMessage(searchError, "客户搜索失败，请稍后重试。"));
+      setError(toAdminErrorMessage(searchError, text.errors.customerSearch));
     } finally {
       setIsSearchingCustomers(false);
     }
@@ -296,7 +582,7 @@ export function AdminNewCasePage() {
 
   async function loadTemplates() {
     if (visaBusinessType === "change" && templateCurrentVisaType === applyingVisaType) {
-      setError("变更业务中，现有签证类型和申请签证类型不能相同；如果相同请选择“更新”。");
+      setError(text.errors.changeSameVisa);
       return;
     }
 
@@ -320,7 +606,7 @@ export function AdminNewCasePage() {
         await selectTemplate(result.items[0]);
       }
     } catch (templateError) {
-      setError(toAdminErrorMessage(templateError, "模板列表加载失败，请稍后重试。"));
+      setError(toAdminErrorMessage(templateError, text.errors.templateList));
     } finally {
       setIsLoadingTemplates(false);
     }
@@ -335,14 +621,14 @@ export function AdminNewCasePage() {
       if (!detail) {
         setTemplateDetail(null);
         setSelectedTemplateItemIds(new Set());
-        setError("模板不存在或已不可用，请重新选择。");
+        setError(text.errors.templateMissing);
         return;
       }
 
       setTemplateDetail(detail);
       setSelectedTemplateItemIds(new Set(detail.items.map((item) => item.id)));
     } catch (templateError) {
-      setError(toAdminErrorMessage(templateError, "模板详情加载失败，请稍后重试。"));
+      setError(toAdminErrorMessage(templateError, text.errors.templateDetail));
     } finally {
       setIsLoadingTemplates(false);
     }
@@ -384,7 +670,7 @@ export function AdminNewCasePage() {
 
   function confirmCustomItem(item: CustomItemForm) {
     if (!item.title.trim()) {
-      setError("请先填写必填项目：材料名称。");
+      setError(text.errors.customItemTitle);
       return;
     }
 
@@ -394,22 +680,22 @@ export function AdminNewCasePage() {
 
   async function createCaseWithSelection() {
     if (customerMode === "reuse" && !selectedCustomer) {
-      setError("请先选择一个已有客户。");
+      setError(text.errors.selectCustomer);
       return;
     }
 
     if (customerMode === "create" && !newCustomer.name.trim()) {
-      setError("请填写客户姓名。");
+      setError(text.errors.customerName);
       return;
     }
 
     if (!templateDetail || !selectedTemplate) {
-      setError("请先选择模板并加载材料预览。");
+      setError(text.errors.selectTemplate);
       return;
     }
 
     if (selectedTemplateItemIds.size === 0 && validCustomItems.length === 0) {
-      setError("请至少保留一个模板材料，或追加一个自定义材料。");
+      setError(text.errors.keepOneItem);
       return;
     }
 
@@ -444,9 +730,14 @@ export function AdminNewCasePage() {
         customItems: validCustomItems.map(toCustomItemInput),
       });
       setCreatedCase(result);
-      setMessage(`案件 ${result.caseNumber} 已创建，已生成 ${result.requirementIds.length} 个材料项。`);
+      setMessage(
+        interpolate(text.success.caseCreated, {
+          caseNumber: result.caseNumber,
+          count: result.requirementIds.length,
+        }),
+      );
     } catch (createError) {
-      setError(toAdminErrorMessage(createError, "案件创建失败，请检查材料选择后重试。"));
+      setError(toAdminErrorMessage(createError, text.errors.createCase));
     } finally {
       setIsBusy(false);
     }
@@ -454,7 +745,7 @@ export function AdminNewCasePage() {
 
   async function createToken() {
     if (!createdCase) {
-      setError("请先创建案件，再创建客户访问链接。");
+      setError(text.errors.createTokenFirstCase);
       return;
     }
 
@@ -466,9 +757,9 @@ export function AdminNewCasePage() {
         reason: "Created during case creation.",
       });
       setCreatedToken(result);
-      setMessage("客户访问链接已创建。明文访问令牌只在当前界面显示一次。");
+      setMessage(text.success.tokenCreated);
     } catch (tokenError) {
-      setError(toAdminErrorMessage(tokenError, "客户访问链接创建失败。案件已创建，可以稍后在详情页重试。"));
+      setError(toAdminErrorMessage(tokenError, text.errors.createToken));
     } finally {
       setIsBusy(false);
     }
@@ -481,9 +772,9 @@ export function AdminNewCasePage() {
 
     try {
       await navigator.clipboard.writeText(createdToken.plaintextToken);
-      setTokenCopyMessage("已复制。请只通过安全渠道发送给客户。");
+      setTokenCopyMessage(text.success.copied);
     } catch {
-      setTokenCopyMessage("复制失败，请手动复制访问令牌文本。");
+      setTokenCopyMessage(text.errors.copyFailed);
     }
   }
 
@@ -492,36 +783,55 @@ export function AdminNewCasePage() {
       <div className="grid gap-3">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
-          <span className="text-xs text-slate-500">{items.length} 项</span>
+          <span className="text-xs text-slate-500">
+            {interpolate(text.labels.itemCount, { count: items.length })}
+          </span>
         </div>
         {items.length === 0 ? (
-          <EmptyState title="没有材料" description="当前模板在这个分组下没有材料。" />
+          <EmptyState
+            title={text.messages.noItems}
+            description={text.messages.noItemsDescription}
+          />
         ) : (
           <div className="grid gap-2">
-            {items.map((item) => (
-              <label
-                key={item.id}
-                className={cx(
-                  "flex gap-3 rounded-2xl border p-3 text-sm transition",
-                  selectedTemplateItemIds.has(item.id)
-                    ? "border-blue-200 bg-blue-50"
-                    : "border-slate-200 bg-white opacity-70",
-                )}
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedTemplateItemIds.has(item.id)}
-                  onChange={() => toggleTemplateItem(item.id)}
-                  className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600"
-                  disabled={Boolean(createdCase)}
-                />
-                <span className="min-w-0">
-                  <span className="block font-medium text-slate-950">
-                    {displayChineseText(item.title)}
+            {items.map((item) => {
+              const itemTitle = templateDetail
+                ? displayVisaTemplateItemTitle(templateDetail, item, locale)
+                : item.title;
+              const itemInstruction = templateDetail
+                ? displayVisaTemplateItemInstruction(templateDetail, item, locale)
+                : (item.customerInstruction ?? "");
+
+              return (
+                <label
+                  key={item.id}
+                  className={cx(
+                    "flex gap-3 rounded-2xl border p-3 text-sm transition",
+                    selectedTemplateItemIds.has(item.id)
+                      ? "border-blue-200 bg-blue-50"
+                      : "border-slate-200 bg-white opacity-70",
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedTemplateItemIds.has(item.id)}
+                    onChange={() => toggleTemplateItem(item.id)}
+                    className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600"
+                    disabled={Boolean(createdCase)}
+                  />
+                  <span className="min-w-0">
+                    <span className="block font-medium text-slate-950">
+                      {locale === "ja" ? itemTitle : displayChineseText(itemTitle)}
+                    </span>
+                    {itemInstruction ? (
+                      <span className="mt-1 block text-xs leading-5 text-slate-600">
+                        {locale === "ja" ? itemInstruction : displayChineseText(itemInstruction)}
+                      </span>
+                    ) : null}
                   </span>
-                </span>
-              </label>
-            ))}
+                </label>
+              );
+            })}
           </div>
         )}
       </div>
@@ -531,7 +841,9 @@ export function AdminNewCasePage() {
   return (
     <main className="mx-auto max-w-7xl">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-950">新建案件</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
+          {text.title}
+        </h1>
       </div>
 
       {message ? (
@@ -547,13 +859,19 @@ export function AdminNewCasePage() {
 
       <div className="grid gap-6 xl:grid-cols-[240px_minmax(0,1fr)_320px]">
         <DashboardCard className="h-fit">
-          <SectionHeader title="建案进度" />
-          <ProgressStepper steps={creationSteps} currentStep={currentStep} />
+          <SectionHeader title={text.progress} />
+          <ProgressStepper
+            steps={creationSteps}
+            currentStep={currentStep}
+            formatLabel={(step) =>
+              text.stepLabels[step as keyof typeof text.stepLabels] ?? step
+            }
+          />
         </DashboardCard>
 
         <div className="grid gap-6">
           <DashboardCard>
-            <SectionHeader title="Step 1：选择客户" />
+            <SectionHeader title={text.stepTitles.customer} />
             <div className="flex gap-2">
               <button
                 type="button"
@@ -566,7 +884,7 @@ export function AdminNewCasePage() {
                     : "bg-slate-100 text-slate-700 hover:bg-slate-200",
                 )}
               >
-                新建客户
+                {text.createCustomer}
               </button>
               <button
                 type="button"
@@ -579,7 +897,7 @@ export function AdminNewCasePage() {
                     : "bg-slate-100 text-slate-700 hover:bg-slate-200",
                 )}
               >
-                复用客户
+                {text.reuseCustomer}
               </button>
             </div>
 
@@ -589,7 +907,7 @@ export function AdminNewCasePage() {
                   value={newCustomer.name}
                   onChange={(event) => setNewCustomer({ ...newCustomer, name: event.target.value })}
                   required
-                  placeholder="客户姓名"
+                  placeholder={text.placeholders.customerName}
                   className="rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                   disabled={Boolean(createdCase)}
                 />
@@ -598,14 +916,14 @@ export function AdminNewCasePage() {
                     value={newCustomer.email}
                     onChange={(event) => setNewCustomer({ ...newCustomer, email: event.target.value })}
                     type="email"
-                    placeholder="邮箱"
+                    placeholder={text.placeholders.email}
                     className="rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                     disabled={Boolean(createdCase)}
                   />
                   <input
                     value={newCustomer.phone}
                     onChange={(event) => setNewCustomer({ ...newCustomer, phone: event.target.value })}
-                    placeholder="电话"
+                    placeholder={text.placeholders.phone}
                     className="rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                     disabled={Boolean(createdCase)}
                   />
@@ -614,21 +932,21 @@ export function AdminNewCasePage() {
                   <input
                     value={newCustomer.nationality}
                     onChange={(event) => setNewCustomer({ ...newCustomer, nationality: event.target.value })}
-                    placeholder="国籍"
+                    placeholder={text.placeholders.nationality}
                     className="rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                     disabled={Boolean(createdCase)}
                   />
                   <DateTextInput
                     value={newCustomer.birthday}
                     onChange={(event) => setNewCustomer({ ...newCustomer, birthday: event.target.value })}
-                    placeholder="出生日期 YYYY-MM-DD"
+                    placeholder={text.placeholders.birthday}
                     disabled={Boolean(createdCase)}
                   />
                 </div>
                 <input
                   value={newCustomer.address}
                   onChange={(event) => setNewCustomer({ ...newCustomer, address: event.target.value })}
-                  placeholder="地址（可选，不会在搜索结果中显示）"
+                  placeholder={text.placeholders.address}
                   className="rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                   disabled={Boolean(createdCase)}
                 />
@@ -639,7 +957,7 @@ export function AdminNewCasePage() {
                   <input
                     value={customerSearch}
                     onChange={(event) => setCustomerSearch(event.target.value)}
-                    placeholder="按姓名、邮箱、电话搜索"
+                    placeholder={text.placeholders.customerSearch}
                     className="min-w-0 flex-1 rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                     disabled={Boolean(createdCase)}
                   />
@@ -649,7 +967,7 @@ export function AdminNewCasePage() {
                     disabled={isSearchingCustomers || Boolean(createdCase)}
                     className="rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-200 hover:bg-blue-700 disabled:bg-slate-300"
                   >
-                    {isSearchingCustomers ? "搜索中..." : "搜索"}
+                    {isSearchingCustomers ? text.actions.searching : text.actions.search}
                   </button>
                 </div>
                 <div className="mt-3 grid gap-2">
@@ -671,13 +989,17 @@ export function AdminNewCasePage() {
                         {customer.email ?? "-"} / {customer.phone ?? "-"} / {customer.nationality ?? "-"} /{" "}
                         {customer.birthday ? formatDateTime(customer.birthday) : "-"}
                       </div>
-                      <div className="text-xs text-slate-500">既有案件数：{customer.caseCount}</div>
+                      <div className="text-xs text-slate-500">
+                        {locale === "ja"
+                          ? `既存案件数：${customer.caseCount}`
+                          : `既有案件数：${customer.caseCount}`}
+                      </div>
                     </button>
                   ))}
                   {hasSearchedCustomers && !isSearchingCustomers && customerResults.length === 0 ? (
                     <EmptyState
-                      title="没有找到匹配客户"
-                      description="可以换关键词继续搜索，或切换到“新建客户”录入新客户。"
+                      title={text.messages.customerSearchEmpty}
+                      description={text.messages.customerSearchEmptyDescription}
                     />
                   ) : null}
                 </div>
@@ -686,10 +1008,10 @@ export function AdminNewCasePage() {
           </DashboardCard>
 
           <DashboardCard>
-            <SectionHeader title="Step 2：选择签证" />
+            <SectionHeader title={text.stepTitles.visa} />
             <div className="grid gap-3">
               <label className="grid gap-1 text-sm font-medium text-slate-700">
-                签证业务类型
+                {text.labels.visaBusinessType}
                 <select
                   value={visaBusinessType}
                   onChange={(event) =>
@@ -717,7 +1039,7 @@ export function AdminNewCasePage() {
             >
               {visaBusinessType === "change" ? (
                 <label className="grid gap-1 text-sm font-medium text-slate-700">
-                  现有签证类型
+                  {text.labels.currentVisaType}
                   <select
                     value={existingVisaType}
                     onChange={(event) => handleExistingVisaTypeChange(event.target.value)}
@@ -733,7 +1055,7 @@ export function AdminNewCasePage() {
                 </label>
               ) : null}
               <label className="grid gap-1 text-sm font-medium text-slate-700">
-                申请签证类型
+                {text.labels.targetVisaType}
                 <select
                   value={applyingVisaType}
                   onChange={(event) => handleApplyingVisaTypeChange(event.target.value)}
@@ -752,14 +1074,14 @@ export function AdminNewCasePage() {
               <input
                 value={caseTitle}
                 onChange={(event) => setCaseTitle(event.target.value)}
-                placeholder="案件标题（可选）"
+                placeholder={text.placeholders.caseTitle}
                 disabled={Boolean(createdCase)}
                 className="rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
               />
               <textarea
                 value={caseInternalNote}
                 onChange={(event) => setCaseInternalNote(event.target.value)}
-                placeholder="内部备注（仅后台可见，可选）"
+                placeholder={text.placeholders.internalNote}
                 disabled={Boolean(createdCase)}
                 className="min-h-24 rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
               />
@@ -769,19 +1091,19 @@ export function AdminNewCasePage() {
                 disabled={isLoadingTemplates || Boolean(createdCase)}
                 className="w-fit rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-200 hover:bg-blue-700 disabled:bg-slate-300"
               >
-                {isLoadingTemplates ? "生成材料一览中..." : "生成材料一览"}
+                {isLoadingTemplates ? text.actions.generating : text.actions.generate}
               </button>
             </div>
           </DashboardCard>
 
           <DashboardCard>
-            <SectionHeader title="Step 3：选择材料模板" />
+            <SectionHeader title={text.stepTitles.template} />
             {!hasLoadedTemplates ? (
-              <p className="text-sm text-slate-600">请选择签证业务类型和申请签证类型后生成材料一览。</p>
+              <p className="text-sm text-slate-600">{text.messages.templateIntro}</p>
             ) : templates.length === 0 ? (
               <EmptyState
-                title="没有匹配模板"
-                description="请检查模板状态、签证业务类型和申请签证类型。当前模板只匹配 active 状态。"
+                title={text.messages.noTemplate}
+                description={text.messages.noTemplateDescription}
               />
             ) : (
               <div className="grid gap-3">
@@ -800,14 +1122,14 @@ export function AdminNewCasePage() {
                   >
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="font-semibold text-slate-950">
-                        {formatTemplateDisplayName(template)}
+                        {formatTemplateDisplayName(template, locale)}
                       </div>
                       <StatusBadge value={template.status} />
                     </div>
                     <div className="mt-2 text-xs leading-5 text-slate-500">
                       {template.templateKey} / v{template.version} /{" "}
                       {displayVisaType(template.currentVisaType)} → {displayVisaType(template.targetVisaType)} /{" "}
-                      {template.itemCount} 项
+                      {interpolate(text.labels.itemCount, { count: template.itemCount })}
                     </div>
                   </button>
                 ))}
@@ -816,43 +1138,48 @@ export function AdminNewCasePage() {
           </DashboardCard>
 
           <DashboardCard>
-            <SectionHeader title="Step 4：确认材料清单" />
+            <SectionHeader title={text.stepTitles.checklist} />
             {!templateDetail ? (
-              <p className="text-sm text-slate-600">请先选择模板。</p>
+              <p className="text-sm text-slate-600">{text.messages.chooseTemplate}</p>
             ) : (
               <div className="grid gap-6">
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                    <div className="text-xs text-slate-500">已选择</div>
+                    <div className="text-xs text-slate-500">{text.labels.selected}</div>
                     <div className="mt-1 text-xl font-semibold text-slate-950">{selectedCount}</div>
                   </div>
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                    <div className="text-xs text-slate-500">已排除</div>
+                    <div className="text-xs text-slate-500">{text.labels.excluded}</div>
                     <div className="mt-1 text-xl font-semibold text-slate-950">{excludedCount}</div>
                   </div>
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                    <div className="text-xs text-slate-500">自定义追加</div>
+                    <div className="text-xs text-slate-500">{text.labels.customAdded}</div>
                     <div className="mt-1 text-xl font-semibold text-slate-950">{validCustomItems.length}</div>
                   </div>
                 </div>
 
-                {renderTemplateItemGroup("客户提交材料", groupedItems.customer)}
-                {renderTemplateItemGroup("事务所做成材料", groupedItems.office)}
+                {renderTemplateItemGroup(text.labels.customerItems, groupedItems.customer)}
+                {renderTemplateItemGroup(text.labels.officeItems, groupedItems.office)}
 
                 <div className="grid gap-3">
                   <div className="flex items-center justify-between gap-3">
-                    <h3 className="text-sm font-semibold text-slate-950">自定义追加材料</h3>
+                    <h3 className="text-sm font-semibold text-slate-950">
+                      {text.labels.customItems}
+                    </h3>
                     <button
                       type="button"
                       onClick={() => setCustomItems((items) => [...items, createEmptyCustomItem()])}
                       disabled={Boolean(createdCase)}
                       className="rounded-2xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:bg-slate-100 disabled:text-slate-400"
                     >
-                      追加材料
+                      {text.actions.addItem}
                     </button>
                   </div>
                   {customItems.length === 0 ? (
-                    <EmptyState title="还没有追加材料" description="可追加客户提交材料或事务所做成材料。" />
+                    <EmptyState
+                      title={text.messages.noCustomItems}
+                      description={text.messages.noCustomItemsDescription}
+                    />
                   ) : (
                     <div className="grid gap-3">
                       {customItems.map((item) => (
@@ -869,29 +1196,33 @@ export function AdminNewCasePage() {
                                 {displayChineseText(item.title)}
                               </span>
                               <span className="mt-1 block text-xs text-slate-500">
-                                {item.responsibleParty === "customer" ? "客户提交材料" : "事务所做成材料"}
-                                {item.dueDate ? ` / 截止日期 ${item.dueDate}` : ""}
+                                {item.responsibleParty === "customer"
+                                  ? text.labels.customerItems
+                                  : text.labels.officeItems}
+                                {item.dueDate ? ` / ${text.labels.dueDate} ${item.dueDate}` : ""}
                               </span>
                             </span>
                             {!createdCase ? (
-                              <span className="shrink-0 text-xs font-medium text-blue-700">点击修改</span>
+                              <span className="shrink-0 text-xs font-medium text-blue-700">
+                                {text.actions.edit}
+                              </span>
                             ) : null}
                           </button>
                         ) : (
                         <div key={item.id} className="rounded-2xl border border-slate-200 p-4">
                           <div className="grid gap-3 md:grid-cols-2">
                             <label className="grid gap-1 text-sm font-medium text-slate-700">
-                              材料名称（必填）
+                              {text.labels.itemName}
                               <input
                                 value={item.title}
                                 onChange={(event) => updateCustomItem(item.id, { title: event.target.value })}
-                                placeholder="例如：补充说明书"
+                                placeholder={text.placeholders.customTitle}
                                 disabled={Boolean(createdCase)}
                                 className="rounded-2xl border border-slate-200 px-3 py-2.5 text-sm font-normal outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                               />
                             </label>
                             <label className="grid gap-1 text-sm font-medium text-slate-700">
-                              负责方
+                              {text.labels.responsibleParty}
                               <select
                                 value={item.responsibleParty}
                                 onChange={(event) =>
@@ -902,43 +1233,43 @@ export function AdminNewCasePage() {
                                 disabled={Boolean(createdCase)}
                                 className="rounded-2xl border border-slate-200 px-3 py-2.5 text-sm font-normal outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                               >
-                                <option value="customer">客户提交材料</option>
-                                <option value="office">事务所做成材料</option>
+                                <option value="customer">{text.labels.customerItems}</option>
+                                <option value="office">{text.labels.officeItems}</option>
                               </select>
                             </label>
                           </div>
                           <div className="mt-3 grid gap-3">
                             <label className="grid gap-1 text-sm font-medium text-slate-700">
-                              客户说明
+                              {text.labels.customerInstruction}
                               <textarea
                                 value={item.customerInstruction}
                                 onChange={(event) =>
                                   updateCustomItem(item.id, { customerInstruction: event.target.value })
                                 }
-                                placeholder="客户提交材料时会显示给客户，可选"
+                                placeholder={text.placeholders.customerInstruction}
                                 disabled={Boolean(createdCase)}
                                 className="min-h-20 rounded-2xl border border-slate-200 px-3 py-2.5 text-sm font-normal outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                               />
                             </label>
                             <label className="grid gap-1 text-sm font-medium text-slate-700">
-                              内部备注
+                              {text.labels.internalNote}
                               <textarea
                                 value={item.internalNote}
                                 onChange={(event) => updateCustomItem(item.id, { internalNote: event.target.value })}
-                                placeholder="仅后台可见，可选"
+                                placeholder={text.placeholders.internalOnly}
                                 disabled={Boolean(createdCase)}
                                 className="min-h-20 rounded-2xl border border-slate-200 px-3 py-2.5 text-sm font-normal outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
                               />
                             </label>
                             <div className="grid gap-3 md:grid-cols-2">
                               <label className="grid gap-1 text-sm font-medium text-slate-700">
-                                截止日期
+                                {text.labels.dueDate}
                                 <DateTextInput
                                   value={item.dueDate}
                                   onChange={(event) => updateCustomItem(item.id, { dueDate: event.target.value })}
                                   disabled={Boolean(createdCase)}
                                   min={todayDateValue}
-                                  placeholder="截止日期 YYYY-MM-DD"
+                                  placeholder={text.placeholders.dueDate}
                                   className="h-12 font-normal"
                                 />
                               </label>
@@ -950,7 +1281,7 @@ export function AdminNewCasePage() {
                                   onClick={() => confirmCustomItem(item)}
                                   className="rounded-2xl bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm shadow-blue-200 hover:bg-blue-700"
                                 >
-                                  确定
+                                  {text.actions.confirm}
                                 </button>
                                 <button
                                   type="button"
@@ -959,7 +1290,7 @@ export function AdminNewCasePage() {
                                   }
                                   className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700"
                                 >
-                                  删除
+                                  {text.actions.delete}
                                 </button>
                               </div>
                             ) : null}
@@ -975,33 +1306,37 @@ export function AdminNewCasePage() {
           </DashboardCard>
 
           <DashboardCard>
-            <SectionHeader title="Step 5：创建案件" />
+            <SectionHeader title={text.stepTitles.create} />
             <div className="grid gap-3 text-sm">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <div className="font-medium text-slate-950">客户</div>
+                <div className="font-medium text-slate-950">{text.labels.customer}</div>
                 <div className="mt-1 text-slate-600">
                   {customerMode === "reuse"
                     ? selectedCustomer
                       ? `${selectedCustomer.name} / ${selectedCustomer.email ?? "-"}`
-                      : "尚未选择已有客户"
-                    : newCustomer.name || "尚未填写客户姓名"}
+                      : text.messages.noExistingCustomer
+                    : newCustomer.name || text.messages.noCustomerName}
                 </div>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <div className="font-medium text-slate-950">申请签证类型</div>
+                <div className="font-medium text-slate-950">{text.labels.targetVisaType}</div>
                 <div className="mt-1 text-slate-600">
                   {displayVisaType(applyingVisaType)}
                 </div>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <div className="font-medium text-slate-950">模板与材料</div>
+                <div className="font-medium text-slate-950">{text.labels.templateAndItems}</div>
                 <div className="mt-1 text-slate-600">
                   {selectedTemplate
-                    ? `${formatTemplateDisplayName(selectedTemplate)} / ${selectedTemplate.templateKey}`
-                    : "尚未选择模板"}
+                    ? `${formatTemplateDisplayName(selectedTemplate, locale)} / ${selectedTemplate.templateKey}`
+                    : text.messages.noSelectedTemplate}
                 </div>
                 <div className="mt-1 text-xs text-slate-500">
-                  已选择 {selectedCount} 项，排除 {excludedCount} 项，自定义 {validCustomItems.length} 项
+                  {interpolate(text.success.selectedSummary, {
+                    selected: selectedCount,
+                    excluded: excludedCount,
+                    custom: validCustomItems.length,
+                  })}
                 </div>
               </div>
               <button
@@ -1010,20 +1345,27 @@ export function AdminNewCasePage() {
                 onClick={createCaseWithSelection}
                 className="w-fit rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-200 hover:bg-blue-700 disabled:bg-slate-300 disabled:shadow-none"
               >
-                {createdCase ? "案件已创建" : isBusy ? "创建中..." : "确认创建案件"}
+                {createdCase
+                  ? text.actions.created
+                  : isBusy
+                    ? text.actions.creating
+                    : text.actions.createCase}
               </button>
               {createdCase ? (
                 <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-                  已创建：{createdCase.caseNumber}，材料项 {createdCase.requirementIds.length} 个。
+                  {interpolate(text.success.createdSummary, {
+                    caseNumber: createdCase.caseNumber,
+                    count: createdCase.requirementIds.length,
+                  })}
                 </div>
               ) : null}
             </div>
           </DashboardCard>
 
           <DashboardCard>
-            <SectionHeader title="Step 6：生成客户链接" />
+            <SectionHeader title={text.stepTitles.token} />
             {!createdCase ? (
-              <p className="text-sm text-slate-600">案件创建后可以选择创建客户访问链接。</p>
+              <p className="text-sm text-slate-600">{text.messages.createTokenAfterCase}</p>
             ) : (
               <div className="grid gap-4">
                 <button
@@ -1032,13 +1374,17 @@ export function AdminNewCasePage() {
                   onClick={createToken}
                   className="w-fit rounded-2xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-200 hover:bg-blue-700 disabled:bg-slate-300 disabled:shadow-none"
                 >
-                  {createdToken ? "客户访问链接已创建" : isBusy ? "创建中..." : "创建客户访问链接"}
+                  {createdToken
+                    ? text.actions.tokenCreated
+                    : isBusy
+                      ? text.actions.creating
+                      : text.actions.createToken}
                 </button>
                 {createdToken ? (
                   <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 shadow-sm">
-                    <div className="font-semibold">明文访问令牌只显示一次。</div>
+                    <div className="font-semibold">{text.messages.tokenOnceTitle}</div>
                     <p className="mt-1 text-xs leading-5">
-                      离开或刷新页面后无法再次查看明文访问令牌。请立即复制，并通过安全渠道发送给客户。
+                      {text.messages.tokenOnceDescription}
                     </p>
                     <code className="mt-2 block break-all rounded bg-white p-3">{createdToken.plaintextToken}</code>
                     <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -1047,9 +1393,14 @@ export function AdminNewCasePage() {
                         onClick={copyToken}
                         className="rounded-2xl bg-amber-950 px-3 py-2 text-sm font-medium text-white"
                       >
-                        复制访问令牌
+                        {text.actions.copyToken}
                       </button>
-                      <span>有效期：{createdToken.expiresAt ? formatDateTime(createdToken.expiresAt) : "无固定过期时间"}</span>
+                      <span>
+                        {text.labels.expiresAt}
+                        {createdToken.expiresAt
+                          ? formatDateTime(createdToken.expiresAt)
+                          : text.messages.noFixedExpiry}
+                      </span>
                     </div>
                     {tokenCopyMessage ? <div className="mt-2 text-xs">{tokenCopyMessage}</div> : null}
                   </div>
@@ -1058,7 +1409,7 @@ export function AdminNewCasePage() {
                   href={`/admin/cases/${createdCase.caseId}`}
                   className="w-fit rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
                 >
-                  打开案件详情
+                  {text.actions.openCase}
                 </Link>
               </div>
             )}
@@ -1066,36 +1417,38 @@ export function AdminNewCasePage() {
         </div>
 
         <DashboardCard className="h-fit">
-          <SectionHeader title="建案摘要" />
+          <SectionHeader title={locale === "ja" ? "作成概要" : "建案摘要"} />
           <div className="grid gap-4 text-sm">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-slate-500">客户模式</span>
+              <span className="text-slate-500">{text.labels.customerMode}</span>
               <StatusBadge value={customerMode} />
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span className="text-slate-500">申请签证类型</span>
+              <span className="text-slate-500">{text.labels.targetVisaType}</span>
               <span className="text-right font-medium text-slate-900">
                 {displayVisaType(applyingVisaType)}
               </span>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span className="text-slate-500">模板</span>
+              <span className="text-slate-500">{text.labels.template}</span>
               <span className="text-right font-medium text-slate-900">
-                {selectedTemplate ? selectedTemplate.templateKey : "未选择"}
+                {selectedTemplate ? selectedTemplate.templateKey : text.messages.notSelected}
               </span>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span className="text-slate-500">材料</span>
+              <span className="text-slate-500">{text.labels.items}</span>
               <span className="font-medium text-slate-900">
                 {selectedCount} / {totalTemplateItems} + {validCustomItems.length}
               </span>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span className="text-slate-500">案件</span>
-              <span className="font-medium text-slate-900">{createdCase?.caseNumber ?? "未创建"}</span>
+              <span className="text-slate-500">{text.labels.case}</span>
+              <span className="font-medium text-slate-900">
+                {createdCase?.caseNumber ?? text.messages.notCreated}
+              </span>
             </div>
             <div className="flex items-center justify-between gap-3">
-              <span className="text-slate-500">客户访问链接</span>
+              <span className="text-slate-500">{text.labels.token}</span>
               <StatusBadge value={createdToken ? "active" : "pending"} />
             </div>
           </div>
