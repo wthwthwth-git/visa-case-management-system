@@ -9,6 +9,14 @@ describe("Chinese display helpers", () => {
     expect(displayVisaType("日本人の配偶者等")).toBe("日本人配偶者等");
   });
 
+  it("maps mixed source visa type labels to Japanese display labels", () => {
+    expect(displayVisaType("无", "ja")).toBe("なし");
+    expect(displayVisaType("高度専門職 学术研究", "ja")).toBe("高度専門職（学術研究）");
+    expect(displayVisaType("高度専門職 专业・技术", "ja")).toBe("高度専門職（専門・技術）");
+    expect(displayVisaType("高度専門職 经营・管理", "ja")).toBe("高度専門職（経営・管理）");
+    expect(displayVisaType("経営・管理", "ja")).toBe("経営・管理");
+  });
+
   it("normalizes template titles and material text for display", () => {
     expect(displayChineseText("无 -> 高度専門職 专业・技术")).toBe(
       "无 → 高度专业人才（专业技术）",

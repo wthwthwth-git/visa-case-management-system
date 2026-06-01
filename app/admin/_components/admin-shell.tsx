@@ -5,7 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { LanguageSwitcher } from "@/app/_components/language-switcher";
 import { useLanguage } from "@/app/_components/language-provider";
-import type { TranslationKey } from "@/app/_lib/i18n";
+import type { AppLocale, TranslationKey } from "@/app/_lib/i18n";
+import { displayLocalizedRequirementTitle } from "@/app/_lib/visa-template-translations";
 import {
   apiGet,
   apiPost,
@@ -42,8 +43,114 @@ function getNotificationHref(notification: NonNullable<AdminNotificationList["it
   return caseHref;
 }
 
+function splitNotificationText(value: string, action: string) {
+  const marker = ` ${action}：`;
+  const markerIndex = value.indexOf(marker);
+
+  if (markerIndex < 0) {
+    return null;
+  }
+
+  return {
+    customerName: value.slice(0, markerIndex).trim(),
+    objectText: value.slice(markerIndex + marker.length).trim(),
+  };
+}
+
+function splitRevisionMessageObject(value: string) {
+  const commentMarker = "。说明：";
+  const commentIndex = value.indexOf(commentMarker);
+
+  if (commentIndex < 0) {
+    return {
+      objectText: value.trim(),
+      comment: null,
+    };
+  }
+
+  return {
+    objectText: value.slice(0, commentIndex).trim(),
+    comment: value.slice(commentIndex + commentMarker.length).trim(),
+  };
+}
+
+function displayNotificationObject(value: string, notification: NonNullable<AdminNotificationList["items"]>[number], locale: AppLocale) {
+  if (locale !== "ja") {
+    return value;
+  }
+
+  if (notification.targetType === "case_document_requirement") {
+    return displayLocalizedRequirementTitle(value, locale);
+  }
+
+  return value;
+}
+
+function localizeNotificationText(
+  notification: NonNullable<AdminNotificationList["items"]>[number],
+  field: "title" | "message",
+  locale: AppLocale,
+) {
+  const source = field === "title" ? notification.title : notification.message;
+
+  if (locale !== "ja") {
+    return source;
+  }
+
+  if (notification.type === "portal_file_uploaded") {
+    const parsed = splitNotificationText(source, "提交了资料");
+
+    if (parsed) {
+      const materialTitle = displayNotificationObject(parsed.objectText, notification, locale);
+      return `${parsed.customerName} が資料を提出しました：${materialTitle}`;
+    }
+  }
+
+  if (notification.type === "application_confirmation_confirmed") {
+    const officeRequirement = splitNotificationText(source, "确认了事务所资料");
+
+    if (officeRequirement) {
+      const materialTitle = displayNotificationObject(officeRequirement.objectText, notification, locale);
+      return `${officeRequirement.customerName} が事務所側資料を確認しました：${materialTitle}`;
+    }
+
+    const applicationForm = splitNotificationText(source, "确认了申请书") ??
+      splitNotificationText(source, "确认了完成资料");
+
+    if (applicationForm) {
+      return `${applicationForm.customerName} が申請書を確認しました：${applicationForm.objectText}`;
+    }
+  }
+
+  if (notification.type === "application_confirmation_revision_requested") {
+    const officeRequirement = splitNotificationText(source, "要求修改事务所资料");
+
+    if (officeRequirement) {
+      const { objectText, comment } = splitRevisionMessageObject(officeRequirement.objectText);
+      const materialTitle = displayNotificationObject(objectText, notification, locale);
+      const baseText = `${officeRequirement.customerName} が事務所側資料の修正を依頼しました：${materialTitle}`;
+      return field === "message" && comment ? `${baseText}。説明：${comment}` : baseText;
+    }
+
+    const applicationForm = splitNotificationText(source, "要求修改申请书") ??
+      splitNotificationText(source, "要求修改完成资料");
+
+    if (applicationForm) {
+      return `${applicationForm.customerName} が申請書の修正を依頼しました：${applicationForm.objectText}`;
+    }
+  }
+
+  if (notification.type === "portal_rate_limit_triggered") {
+    return field === "title"
+      ? "お客様用アクセスリンクでアクセス頻度制限が発生しました"
+      : "お客様用アクセスリンクでアクセス頻度制限が発生しました。異常なアクセスがないか確認してください。";
+  }
+
+  return source;
+}
+
 function NotificationButton() {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<AdminNotificationList | null>(null);
@@ -186,10 +293,10 @@ function NotificationButton() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="truncate text-sm font-semibold text-slate-950">
-                          {notification.title}
+                          {localizeNotificationText(notification, "title", locale)}
                         </div>
                         <div className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">
-                          {notification.message}
+                          {localizeNotificationText(notification, "message", locale)}
                         </div>
                       </div>
                       <span

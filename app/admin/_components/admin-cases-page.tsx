@@ -216,7 +216,7 @@ export function AdminCasesPage() {
                 <div className="font-medium text-slate-950">{item.customer.name}</div>
               </td>
               <td className="px-5 py-4">
-                <div className="text-slate-800">{displayVisaType(item.targetVisaType)}</div>
+                <div className="text-slate-800">{displayVisaType(item.targetVisaType, locale)}</div>
               </td>
               <td className="px-5 py-4">
                 <StatusBadge

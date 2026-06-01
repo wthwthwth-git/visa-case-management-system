@@ -432,8 +432,8 @@ function formatTemplateDisplayName(template: {
     return displayChineseText(template.title ?? "材料一览模板");
   }
 
-  const currentVisaType = displayVisaType(template.currentVisaType);
-  const targetVisaType = displayVisaType(template.targetVisaType);
+  const currentVisaType = displayVisaType(template.currentVisaType, locale);
+  const targetVisaType = displayVisaType(template.targetVisaType, locale);
 
   if (template.currentVisaType === "无") {
     return `${targetVisaType}认定`;
@@ -1048,7 +1048,7 @@ export function AdminNewCasePage() {
                   >
                     {changeCurrentVisaTypes.map((visaType) => (
                       <option key={visaType} value={visaType}>
-                        {displayVisaType(visaType)}
+                        {displayVisaType(visaType, locale)}
                       </option>
                     ))}
                   </select>
@@ -1064,7 +1064,7 @@ export function AdminNewCasePage() {
                 >
                   {targetVisaTypes.map((visaType) => (
                     <option key={visaType} value={visaType}>
-                      {displayVisaType(visaType)}
+                      {displayVisaType(visaType, locale)}
                     </option>
                   ))}
                 </select>
@@ -1128,7 +1128,8 @@ export function AdminNewCasePage() {
                     </div>
                     <div className="mt-2 text-xs leading-5 text-slate-500">
                       {template.templateKey} / v{template.version} /{" "}
-                      {displayVisaType(template.currentVisaType)} → {displayVisaType(template.targetVisaType)} /{" "}
+                      {displayVisaType(template.currentVisaType, locale)} →{" "}
+                      {displayVisaType(template.targetVisaType, locale)} /{" "}
                       {interpolate(text.labels.itemCount, { count: template.itemCount })}
                     </div>
                   </button>
@@ -1321,7 +1322,7 @@ export function AdminNewCasePage() {
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
                 <div className="font-medium text-slate-950">{text.labels.targetVisaType}</div>
                 <div className="mt-1 text-slate-600">
-                  {displayVisaType(applyingVisaType)}
+                  {displayVisaType(applyingVisaType, locale)}
                 </div>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
@@ -1426,7 +1427,7 @@ export function AdminNewCasePage() {
             <div className="flex items-center justify-between gap-3">
               <span className="text-slate-500">{text.labels.targetVisaType}</span>
               <span className="text-right font-medium text-slate-900">
-                {displayVisaType(applyingVisaType)}
+                {displayVisaType(applyingVisaType, locale)}
               </span>
             </div>
             <div className="flex items-center justify-between gap-3">

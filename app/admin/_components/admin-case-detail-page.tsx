@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLanguage } from "@/app/_components/language-provider";
 import { displayChineseText, displayVisaType } from "@/app/_lib/chinese-display";
+import type { AppLocale } from "@/app/_lib/i18n";
+import { displayLocalizedRequirementTitle } from "@/app/_lib/visa-template-translations";
 import {
   apiGet,
   formatDateTime,
@@ -159,6 +161,10 @@ function formatCaseDetailText(template: string, params: Record<string, string | 
   );
 }
 
+function localText(locale: AppLocale, zh: string, ja: string): string {
+  return locale === "ja" ? ja : zh;
+}
+
 type ApiSuccess<T> = {
   data: T;
 };
@@ -239,77 +245,177 @@ function getRequirementFromEvent(event: AdminTimelineEvent, lookup: RequirementL
   return fileId ? lookup.byFileId.get(fileId) ?? null : null;
 }
 
-function getRequirementScopeLabel(requirement: AdminRequirement | null): string {
+const changeHistoryText = {
+  zh: {
+    requirement: "资料项",
+    customerRequirement: "客户资料",
+    officeRequirement: "事务所资料",
+    customerImmigrationRequirement: "入管追加材料（客户资料）",
+    officeImmigrationRequirement: "入管追加材料（事务所资料）",
+    empty: "暂无变更履历。",
+    all: "全部变更履历",
+    requirementName: "资料名",
+    time: "时间",
+    timeFilter: "时间筛选",
+    startDate: "开始日期",
+    endDate: "结束日期",
+    clear: "清除",
+    noFilterableRequirements: "暂无可筛选资料。",
+    count: (filtered: number, total: number) => `显示 ${filtered} / ${total} 条履历`,
+    fileUploaded: (scope: string, title: string) => `${scope}${title}已上传文件。`,
+    fileDeleted: (scope: string, title: string) => `${scope}${title}已删除文件。`,
+    statusChanged: (scope: string, title: string, oldStatus: string | null, newStatus: string | null) =>
+      oldStatus && newStatus
+        ? `${scope}${title}状态由「${oldStatus}」变更为「${newStatus}」。`
+        : `${scope}${title}状态已变更。`,
+    noteUpdated: (scope: string, title: string) => `${scope}${title}备注已更新。`,
+    requirementCreated: (scope: string, title: string) => `${scope}${title}已追加。`,
+    requirementDeleted: (scope: string, title: string) => `${scope}${title}已删除。`,
+    phaseChanged: (oldPhase: string | null, newPhase: string | null) =>
+      oldPhase && newPhase
+        ? `案件阶段由「${oldPhase}」变更为「${newPhase}」。`
+        : "案件阶段已变更。",
+    templateItemsCopied: (selectedText: string, customText: string) => `已生成${selectedText}${customText}。`,
+    selectedTemplateItems: (count: number | null) => (count === null ? "模板资料" : `${count} 项模板资料`),
+    customItemsSuffix: (count: number) => `，另追加 ${count} 项自定义资料`,
+    customRequirementsCreated: (count: number | null) =>
+      count === null ? "已追加自定义资料。" : `已追加 ${count} 项自定义资料。`,
+    tokenCreated: "客户访问链接已创建。",
+    tokenRegenerated: "客户访问链接已重新生成，旧链接已失效。",
+    tokenRevoked: "客户访问链接已撤销。",
+    applicationConfirmationCreated: "申请书确认版本已创建。",
+    applicationConfirmationCompleted: "客户已完成申请书确认。",
+    applicationConfirmationStatusChanged: "申请书确认状态已变更。",
+    caseCreated: "案件已创建。",
+  },
+  ja: {
+    requirement: "資料項目",
+    customerRequirement: "お客様側資料",
+    officeRequirement: "事務所側資料",
+    customerImmigrationRequirement: "入管追加資料（お客様側資料）",
+    officeImmigrationRequirement: "入管追加資料（事務所側資料）",
+    empty: "変更履歴はありません。",
+    all: "すべての変更履歴",
+    requirementName: "資料名",
+    time: "時間",
+    timeFilter: "期間で絞り込み",
+    startDate: "開始日",
+    endDate: "終了日",
+    clear: "クリア",
+    noFilterableRequirements: "絞り込み可能な資料はありません。",
+    count: (filtered: number, total: number) => `${filtered} / ${total} 件の履歴を表示`,
+    fileUploaded: (scope: string, title: string) => `${scope}${title}のファイルをアップロードしました。`,
+    fileDeleted: (scope: string, title: string) => `${scope}${title}のファイルを削除しました。`,
+    statusChanged: (scope: string, title: string, oldStatus: string | null, newStatus: string | null) =>
+      oldStatus && newStatus
+        ? `${scope}${title}のステータスを「${oldStatus}」から「${newStatus}」へ変更しました。`
+        : `${scope}${title}のステータスを変更しました。`,
+    noteUpdated: (scope: string, title: string) => `${scope}${title}の備考を更新しました。`,
+    requirementCreated: (scope: string, title: string) => `${scope}${title}を追加しました。`,
+    requirementDeleted: (scope: string, title: string) => `${scope}${title}を削除しました。`,
+    phaseChanged: (oldPhase: string | null, newPhase: string | null) =>
+      oldPhase && newPhase
+        ? `案件段階を「${oldPhase}」から「${newPhase}」へ変更しました。`
+        : "案件段階を変更しました。",
+    templateItemsCopied: (selectedText: string, customText: string) => `${selectedText}${customText}を生成しました。`,
+    selectedTemplateItems: (count: number | null) => (count === null ? "テンプレート資料" : `${count}件のテンプレート資料`),
+    customItemsSuffix: (count: number) => `、あわせて${count}件のカスタム資料`,
+    customRequirementsCreated: (count: number | null) =>
+      count === null ? "カスタム資料を追加しました。" : `${count}件のカスタム資料を追加しました。`,
+    tokenCreated: "お客様用アクセスリンクを作成しました。",
+    tokenRegenerated: "お客様用アクセスリンクを再生成し、旧リンクを無効化しました。",
+    tokenRevoked: "お客様用アクセスリンクを無効化しました。",
+    applicationConfirmationCreated: "申請書確認版を作成しました。",
+    applicationConfirmationCompleted: "お客様が申請書確認を完了しました。",
+    applicationConfirmationStatusChanged: "申請書確認ステータスを変更しました。",
+    caseCreated: "案件を作成しました。",
+  },
+} satisfies Record<AppLocale, Record<string, unknown>>;
+
+function getChangeHistoryText(locale: AppLocale) {
+  return changeHistoryText[locale] as typeof changeHistoryText.zh;
+}
+
+function getRequirementScopeLabel(requirement: AdminRequirement | null, locale: AppLocale): string {
+  const text = getChangeHistoryText(locale);
+
   if (!requirement) {
-    return "资料项";
+    return text.requirement;
   }
 
   if (requirement.sourceType === "immigration_request") {
-    return requirement.responsibleParty === "customer" ? "入管追加材料（客户资料）" : "入管追加材料（事务所资料）";
+    return requirement.responsibleParty === "customer"
+      ? text.customerImmigrationRequirement
+      : text.officeImmigrationRequirement;
   }
 
-  return requirement.responsibleParty === "customer" ? "客户资料" : "事务所资料";
+  return requirement.responsibleParty === "customer" ? text.customerRequirement : text.officeRequirement;
 }
 
-function formatChangeHistoryDetail(event: AdminTimelineEvent, lookup: RequirementLookup): string {
+function formatChangeHistoryDetail(event: AdminTimelineEvent, lookup: RequirementLookup, locale: AppLocale): string {
+  const text = getChangeHistoryText(locale);
   const requirement = getRequirementFromEvent(event, lookup);
-  const requirementTitle = requirement ? `「${displayChineseText(requirement.title)}」` : "";
-  const scope = getRequirementScopeLabel(requirement);
+  const requirementTitle = requirement ? `「${displayLocalizedRequirementTitle(requirement.title, locale)}」` : "";
+  const scope = getRequirementScopeLabel(requirement, locale);
 
   switch (event.eventType) {
     case "file_uploaded":
-      return `${scope}${requirementTitle}已上传文件。`;
+      return text.fileUploaded(scope, requirementTitle);
     case "file_deleted":
-      return `${scope}${requirementTitle}已删除文件。`;
+    case "file_removed":
+      return text.fileDeleted(scope, requirementTitle);
     case "requirement_status_changed": {
       const oldStatus = getMetadataString(event, "oldStatus");
       const newStatus = getMetadataString(event, "newStatus");
-      const statusText = oldStatus && newStatus
-        ? `状态由「${displayLabel(oldStatus)}」变更为「${displayLabel(newStatus)}」。`
-        : "状态已变更。";
-      return `${scope}${requirementTitle}${statusText}`;
+      return text.statusChanged(
+        scope,
+        requirementTitle,
+        oldStatus ? displayLabel(oldStatus, locale) : null,
+        newStatus ? displayLabel(newStatus, locale) : null,
+      );
     }
     case "requirement_note_updated":
-      return `${scope}${requirementTitle}备注已更新。`;
+      return text.noteUpdated(scope, requirementTitle);
     case "requirement_created":
-      return `${scope}${requirementTitle}已追加。`;
+      return text.requirementCreated(scope, requirementTitle);
     case "requirement_deleted":
-      return `${scope}${requirementTitle}已删除。`;
+      return text.requirementDeleted(scope, requirementTitle);
     case "case_phase_changed": {
       const oldPhase = getMetadataString(event, "oldPhase");
       const newPhase = getMetadataString(event, "newPhase");
-      return oldPhase && newPhase
-        ? `案件阶段由「${displayCasePhaseLabel(oldPhase)}」变更为「${displayCasePhaseLabel(newPhase)}」。`
-        : "案件阶段已变更。";
+      return text.phaseChanged(
+        oldPhase ? displayCasePhaseLabel(oldPhase, locale) : null,
+        newPhase ? displayCasePhaseLabel(newPhase, locale) : null,
+      );
     }
     case "template_items_selected_copied": {
       const selectedCount = getMetadataValue(event, "selectedItemCount");
       const customCount = getMetadataValue(event, "customItemCount");
-      const selectedText = typeof selectedCount === "number" ? `${selectedCount} 项模板资料` : "模板资料";
-      const customText = typeof customCount === "number" && customCount > 0 ? `，另追加 ${customCount} 项自定义资料` : "";
-      return `已生成${selectedText}${customText}。`;
+      const selectedText = text.selectedTemplateItems(typeof selectedCount === "number" ? selectedCount : null);
+      const customText = typeof customCount === "number" && customCount > 0 ? text.customItemsSuffix(customCount) : "";
+      return text.templateItemsCopied(selectedText, customText);
     }
     case "custom_requirements_created": {
       const customCount = getMetadataValue(event, "customItemCount");
-      return typeof customCount === "number" ? `已追加 ${customCount} 项自定义资料。` : "已追加自定义资料。";
+      return text.customRequirementsCreated(typeof customCount === "number" ? customCount : null);
     }
     case "token_created":
-      return "客户访问链接已创建。";
+      return text.tokenCreated;
     case "token_regenerated":
-      return "客户访问链接已重新生成，旧链接已失效。";
+      return text.tokenRegenerated;
     case "token_revoked":
-      return "客户访问链接已撤销。";
+      return text.tokenRevoked;
     case "application_confirmation_created":
     case "application_confirmation_version_created":
-      return "申请书确认版本已创建。";
+      return text.applicationConfirmationCreated;
     case "application_confirmation_completed":
-      return "客户已完成申请书确认。";
+      return text.applicationConfirmationCompleted;
     case "application_confirmation_status_changed":
-      return "申请书确认状态已变更。";
+      return text.applicationConfirmationStatusChanged;
     case "case_created":
-      return "案件已创建。";
+      return text.caseCreated;
     default:
-      return displayLabel(event.eventType);
+      return displayLabel(event.eventType, locale);
   }
 }
 
@@ -431,6 +537,7 @@ function getVisibleRequirementInternalNote(
 
 function getRequirementNoteDisplay(
   requirement: Pick<AdminRequirement, "internalNote" | "responsibleParty" | "status">,
+  locale: AppLocale = "zh",
 ) {
   const note = getVisibleRequirementInternalNote(requirement);
 
@@ -442,13 +549,13 @@ function getRequirementNoteDisplay(
 
   if (note.startsWith(clientRevisionPrefix)) {
     return {
-      label: "客户要求的说明",
+      label: localText(locale, "客户要求的说明", "お客様からの修正依頼"),
       text: note.slice(clientRevisionPrefix.length).trim(),
     };
   }
 
   return {
-    label: "内部备注",
+    label: localText(locale, "内部备注", "内部メモ"),
     text: note,
   };
 }
@@ -545,29 +652,36 @@ function shouldShowSubmissionInfo(casePhase: string) {
   return submittedIndex >= 0 && currentIndex >= submittedIndex;
 }
 
-function formatCasePhaseSubmitError(error: unknown) {
-  const message = toAdminErrorMessage(error, "案件阶段切换失败。请检查阶段和原因后重试。");
+function formatCasePhaseSubmitError(error: unknown, locale: AppLocale) {
+  const message = toAdminErrorMessage(
+    error,
+    localText(locale, "案件阶段切换失败。请检查阶段和原因后重试。", "案件段階の変更に失敗しました。段階と理由を確認して再度お試しください。"),
+  );
 
   if (message === "Invalid request." || /transition|not allowed/i.test(message)) {
-    return "案件阶段切换失败。请选择不同的案件阶段后重试。";
+    return localText(
+      locale,
+      "案件阶段切换失败。请选择不同的案件阶段后重试。",
+      "案件段階の変更に失敗しました。別の案件段階を選択して再度お試しください。",
+    );
   }
 
   return message;
 }
 
-function formatVisaBusinessSummary(currentVisaType: string, targetVisaType: string) {
-  const current = displayVisaType(currentVisaType);
-  const target = displayVisaType(targetVisaType);
+function formatVisaBusinessSummary(currentVisaType: string, targetVisaType: string, locale: AppLocale) {
+  const current = displayVisaType(currentVisaType, locale);
+  const target = displayVisaType(targetVisaType, locale);
 
   if (currentVisaType === "无") {
-    return `认定 / ${target}`;
+    return locale === "ja" ? `認定申請 / ${target}` : `认定 / ${target}`;
   }
 
   if (currentVisaType === targetVisaType) {
-    return `更新 / ${target}`;
+    return locale === "ja" ? `更新申請 / ${target}` : `更新 / ${target}`;
   }
 
-  return `变更 / ${current} → ${target}`;
+  return locale === "ja" ? `変更申請 / ${current} → ${target}` : `变更 / ${current} → ${target}`;
 }
 
 const todayDateValue = new Date().toISOString().slice(0, 10);
@@ -682,9 +796,8 @@ function formatFileSize(value: string): string {
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function formatChangeHistorySummary(value: string) {
-  const normalized = value.trim().toLowerCase();
-  const summaryMap: Record<string, string> = {
+const changeHistorySummaryMap = {
+  zh: {
     "case created.": "案件已创建",
     "template items copied.": "模板材料已复制",
     "selected template items copied.": "模板材料已复制",
@@ -699,20 +812,62 @@ function formatChangeHistorySummary(value: string) {
     "internal note updated.": "备注已更新",
     "file uploaded.": "文件已上传",
     "document file uploaded.": "文件已上传",
+    "文件已上传": "文件已上传",
     "file removed.": "文件已删除",
     "requirement submitted.": "客户已提交资料",
+    "客户已提交资料": "客户已提交资料",
     "requirement submission withdrawn.": "客户已撤回资料",
+    "客户已撤回资料": "客户已撤回资料",
     "office requirement confirmed by client.": "客户已确认事务所资料",
+    "客户已确认事务所资料": "客户已确认事务所资料",
     "client requested office requirement revision.": "客户要求修改事务所资料",
+    "客户要求修改事务所资料": "客户要求修改事务所资料",
     "requirement status changed.": "材料状态已变更",
     "case phase changed.": "案件阶段已变更",
     "application confirmation created.": "申请书确认已创建",
     "application confirmation version created.": "申请书确认版本已创建",
     "application confirmation completed.": "申请书确认已完成",
     "application confirmation status changed.": "申请书确认状态已变更",
-  };
+  },
+  ja: {
+    "case created.": "案件を作成しました",
+    "template items copied.": "テンプレート資料を反映しました",
+    "selected template items copied.": "テンプレート資料を反映しました",
+    "custom requirements created.": "カスタム資料を作成しました",
+    "custom requirement created.": "追加資料を作成しました",
+    "immigration additional requirement created.": "入管追加資料を作成しました",
+    "portal token created.": "お客様用アクセスリンクを作成しました",
+    "portal token regenerated.": "お客様用アクセスリンクを再生成しました",
+    "portal token revoked.": "お客様用アクセスリンクを無効化しました",
+    "previous portal token revoked during regeneration.": "旧お客様用アクセスリンクを無効化しました",
+    "internal note created.": "備考を作成しました",
+    "internal note updated.": "備考を更新しました",
+    "file uploaded.": "ファイルをアップロードしました",
+    "document file uploaded.": "ファイルをアップロードしました",
+    "文件已上传": "ファイルをアップロードしました",
+    "file removed.": "ファイルを削除しました",
+    "requirement submitted.": "お客様が資料を提出しました",
+    "客户已提交资料": "お客様が資料を提出しました",
+    "requirement submission withdrawn.": "お客様が資料提出を取り消しました",
+    "客户已撤回资料": "お客様が資料提出を取り消しました",
+    "office requirement confirmed by client.": "お客様が事務所側資料を確認しました",
+    "客户已确认事务所资料": "お客様が事務所側資料を確認しました",
+    "client requested office requirement revision.": "お客様が事務所側資料の修正を依頼しました",
+    "客户要求修改事务所资料": "お客様が事務所側資料の修正を依頼しました",
+    "requirement status changed.": "資料ステータスを変更しました",
+    "case phase changed.": "案件段階を変更しました",
+    "application confirmation created.": "申請書確認を作成しました",
+    "application confirmation version created.": "申請書確認版を作成しました",
+    "application confirmation completed.": "申請書確認が完了しました",
+    "application confirmation status changed.": "申請書確認ステータスを変更しました",
+  },
+} satisfies Record<AppLocale, Record<string, string>>;
 
-  return summaryMap[normalized] ?? displayChineseText(value);
+function formatChangeHistorySummary(value: string, locale: AppLocale) {
+  const normalized = value.trim().toLowerCase();
+  const summaryMap: Record<string, string> = changeHistorySummaryMap[locale];
+
+  return summaryMap[normalized] ?? summaryMap[value.trim()] ?? displayChineseText(value);
 }
 
 function getUploadedRequirementFiles(requirement: AdminRequirement) {
@@ -766,8 +921,10 @@ function sortApprovedRequirementsLast(requirements: AdminRequirement[]) {
   });
 }
 
-function getRequirementReviewButtonLabel(requirement: AdminRequirement) {
-  return requirement.responsibleParty === "office" ? "制作状态变更" : "审核状态变更";
+function getRequirementReviewButtonLabel(requirement: AdminRequirement, locale: AppLocale) {
+  return requirement.responsibleParty === "office"
+    ? localText(locale, "制作状态变更", "作成状態を変更")
+    : localText(locale, "审核状态变更", "確認状態を変更");
 }
 
 function canPreviewInModal(file: AdminRequirementFile): boolean {
@@ -811,7 +968,11 @@ function triggerBlobDownload(input: { blob: Blob; fileName: string }) {
   }
 }
 
-function confirmImportantAction(message: string): boolean {
+function confirmImportantAction(message: string, locale: AppLocale = "zh"): boolean {
+  if (locale === "ja") {
+    return window.confirm(`確認してください：${message}\n\n続行すると案件詳細を再読み込みします。`);
+  }
+
   return window.confirm(`请确认：${message}\n\n继续后系统会刷新案件详情。`);
 }
 
@@ -822,7 +983,7 @@ function SubmitSpinner() {
 }
 
 function FormActions({
-  cancelLabel = "取消",
+  cancelLabel,
   submitLabel,
   submittingLabel,
   isSubmitting,
@@ -836,6 +997,9 @@ function FormActions({
   onCancel: () => void;
   submitTone?: "blue" | "rose";
 }) {
+  const { locale } = useLanguage();
+  const resolvedCancelLabel = cancelLabel ?? (locale === "ja" ? "キャンセル" : "取消");
+
   return (
     <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
       <button
@@ -844,7 +1008,7 @@ function FormActions({
         onClick={onCancel}
         className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 sm:w-auto"
       >
-        {cancelLabel}
+        {resolvedCancelLabel}
       </button>
       <button
         disabled={isSubmitting}
@@ -904,6 +1068,7 @@ function RequirementGroup({
   deletingRequirementRecordId: string | null;
   focusedRequirementId?: string | null;
 }) {
+  const { locale } = useLanguage();
   const [isExpanded, setIsExpanded] = useState(true);
   const headerAction =
     action || collapsible ? (
@@ -929,7 +1094,7 @@ function RequirementGroup({
           }
         >
           <h2 className="text-base font-semibold text-slate-950">
-            {title} / {requirements.length} 项
+            {title} / {requirements.length} {localText(locale, "项", "件")}
           </h2>
           {headerAction}
         </div>
@@ -943,7 +1108,9 @@ function RequirementGroup({
         >
           <h3 className="text-sm font-semibold text-slate-700">
             {title}
-            <span className="ml-2 font-medium text-slate-400">{requirements.length} 项</span>
+            <span className="ml-2 font-medium text-slate-400">
+              {requirements.length} {localText(locale, "项", "件")}
+            </span>
           </h3>
           {headerAction}
         </div>
@@ -951,7 +1118,7 @@ function RequirementGroup({
       {isExpanded ? <div className="grid gap-3">
         {requirements.length === 0 ? (
           standalone ? (
-            <EmptyState title="暂无资料项" description={emptyMessage} />
+            <EmptyState title={localText(locale, "暂无资料项", "資料項目はありません")} description={emptyMessage} />
           ) : (
             <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
               {emptyMessage}
@@ -962,7 +1129,7 @@ function RequirementGroup({
           const uploadedFiles = getUploadedRequirementFiles(requirement);
           const statusBadgeValue = getRequirementStatusBadgeValue(requirement);
           const visibleInternalNote = getVisibleRequirementInternalNote(requirement);
-          const visibleNoteDisplay = getRequirementNoteDisplay(requirement);
+          const visibleNoteDisplay = getRequirementNoteDisplay(requirement, locale);
           const effectiveStatus = getEffectiveRequirementStatus(requirement);
           const showDueDate =
             requirement.dueDate && effectiveStatus === "not_submitted";
@@ -984,10 +1151,13 @@ function RequirementGroup({
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <div className="font-medium text-slate-950">{displayChineseText(requirement.title)}</div>
+                <div className="font-medium text-slate-950">
+                  {displayLocalizedRequirementTitle(requirement.title, locale)}
+                </div>
                 {showDueDate ? (
                   <span className="rounded-full border border-amber-100 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
-                    截止日期：{formatDateOnly(requirement.dueDate)}
+                    {localText(locale, "截止日期：", "提出期限：")}
+                    {formatDateOnly(requirement.dueDate)}
                   </span>
                 ) : null}
               </div>
@@ -997,7 +1167,7 @@ function RequirementGroup({
               <div className="mt-4 rounded-2xl border border-slate-100 bg-slate-50/70 p-3">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                   <div className="text-xs font-semibold text-slate-500">
-                    已上传文件（{uploadedFiles.length}）
+                    {localText(locale, "已上传文件", "アップロード済みファイル")}（{uploadedFiles.length}）
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <button
@@ -1006,7 +1176,9 @@ function RequirementGroup({
                       onClick={() => onDownloadAllFiles(requirement)}
                       className="rounded-full border border-blue-100 bg-white px-3 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
                     >
-                      {isDownloadingAll ? "下载中..." : "全部下载"}
+                      {isDownloadingAll
+                        ? localText(locale, "下载中...", "ダウンロード中...")
+                        : localText(locale, "全部下载", "すべてダウンロード")}
                     </button>
                     <button
                       type="button"
@@ -1014,7 +1186,9 @@ function RequirementGroup({
                       onClick={() => onDeleteAllFiles(requirement)}
                       className="rounded-full border border-rose-100 bg-white px-3 py-1 text-xs font-semibold text-rose-500 hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
                     >
-                      {isDeletingAll ? "删除中..." : "全部删除"}
+                      {isDeletingAll
+                        ? localText(locale, "删除中...", "削除中...")
+                        : localText(locale, "全部删除", "すべて削除")}
                     </button>
                   </div>
                 </div>
@@ -1037,7 +1211,7 @@ function RequirementGroup({
                         type="button"
                         disabled={deletingFileId === file.id || isDeletingAll}
                         onClick={() => onDeleteFile(file)}
-                        aria-label={`删除 ${file.originalFileName}`}
+                        aria-label={localText(locale, `删除 ${file.originalFileName}`, `${file.originalFileName} を削除`)}
                         className="shrink-0 px-1 text-base leading-none text-rose-400 hover:text-rose-700 disabled:cursor-not-allowed disabled:text-slate-300"
                       >
                         ×
@@ -1065,7 +1239,7 @@ function RequirementGroup({
                     onClick={() => onReview(requirement)}
                     className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
                   >
-                    {getRequirementReviewButtonLabel(requirement)}
+                    {getRequirementReviewButtonLabel(requirement, locale)}
                   </button>
                 ) : null}
                 <button
@@ -1073,14 +1247,16 @@ function RequirementGroup({
                   onClick={() => onUpload(requirement)}
                   className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                 >
-                  上传文件
+                  {localText(locale, "上传文件", "ファイルをアップロード")}
                 </button>
                 <button
                   type="button"
                   onClick={() => onNote(requirement)}
                   className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                 >
-                  {visibleInternalNote || requirement.customerInstruction ? "修改备注" : "添加备注"}
+                  {visibleInternalNote || requirement.customerInstruction
+                    ? localText(locale, "修改备注", "メモを編集")
+                    : localText(locale, "添加备注", "メモを追加")}
                 </button>
                 {canEditDueDate ? (
                   <button
@@ -1088,7 +1264,9 @@ function RequirementGroup({
                     onClick={() => onDueDate(requirement)}
                     className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                   >
-                    {requirement.dueDate ? "修改截止日期" : "设置截止日期"}
+                    {requirement.dueDate
+                      ? localText(locale, "修改截止日期", "提出期限を編集")
+                      : localText(locale, "设置截止日期", "提出期限を設定")}
                   </button>
                 ) : null}
               </div>
@@ -1098,7 +1276,9 @@ function RequirementGroup({
                 onClick={() => onDeleteRequirement(requirement)}
                 className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300"
               >
-                {isDeletingRequirement ? "删除中..." : "删除资料"}
+                {isDeletingRequirement
+                  ? localText(locale, "删除中...", "削除中...")
+                  : localText(locale, "删除资料", "資料を削除")}
               </button>
             </div>
           </div>
@@ -1122,15 +1302,20 @@ function CollapseIconButton({
   isExpanded: boolean;
   onClick: () => void;
 }) {
+  const { locale } = useLanguage();
+  const label = isExpanded
+    ? localText(locale, "收起", "閉じる")
+    : localText(locale, "展开", "展開");
+
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label={isExpanded ? "收起" : "展开"}
-      title={isExpanded ? "收起" : "展开"}
+      aria-label={label}
+      title={label}
       className="inline-flex h-8 items-center gap-1 rounded-lg px-1.5 text-xs font-medium text-slate-500 outline-none transition hover:text-slate-800 focus-visible:ring-2 focus-visible:ring-blue-100"
     >
-      <span>{isExpanded ? "收起" : "展开"}</span>
+      <span>{label}</span>
       <span className="translate-y-[-1px] text-[9px] leading-none text-slate-400">
         {isExpanded ? "▲" : "▼"}
       </span>
@@ -1151,6 +1336,7 @@ function RequirementReviewForm({
   onSuccess: (result: MutationResult) => Promise<void>;
   onBusyChange: (isBusy: boolean) => void;
 }) {
+  const { locale } = useLanguage();
   const hasUploadedFiles = getUploadedRequirementFiles(requirement).length > 0;
   const needsCustomerInstruction = requirement.responsibleParty === "customer";
   const isOfficeRequirement = requirement.responsibleParty === "office";
@@ -1172,7 +1358,10 @@ function RequirementReviewForm({
       !isOfficeRequirement &&
       requirement.status === "approved" &&
       newStatus === "needs_more" &&
-      !confirmImportantAction("该资料已通过审核，继续后会退回为“需补充”。")
+      !confirmImportantAction(
+        localText(locale, "该资料已通过审核，继续后会退回为“需补充”。", "この資料は確認済みです。続行すると「追加提出」に戻ります。"),
+        locale,
+      )
     ) {
       return;
     }
@@ -1182,7 +1371,13 @@ function RequirementReviewForm({
       (newStatus === "needs_more" || newStatus === "not_applicable") &&
       customerInstruction.trim().length === 0
     ) {
-      setError("选择“需补充”或“需修改”时，请填写补充说明。");
+      setError(
+        localText(
+          locale,
+          "选择“需补充”或“需修改”时，请填写补充说明。",
+          "「追加提出」又は「修正依頼」を選択する場合は、お客様向け説明を入力してください。",
+        ),
+      );
       return;
     }
 
@@ -1194,10 +1389,17 @@ function RequirementReviewForm({
         ...(needsCustomerInstruction ? { customerInstruction } : {}),
       });
       await onSuccess({
-        message: isOfficeRequirement ? "事务所资料制作状态已更新。" : "资料审核状态已更新。",
+        message: isOfficeRequirement
+          ? localText(locale, "事务所资料制作状态已更新。", "事務所資料の作成状態を更新しました。")
+          : localText(locale, "资料审核状态已更新。", "資料の確認状態を更新しました。"),
       });
     } catch (submitError) {
-      setError(toAdminErrorMessage(submitError, "资料审核失败。请检查状态和原因后重试。"));
+      setError(
+        toAdminErrorMessage(
+          submitError,
+          localText(locale, "资料审核失败。请检查状态和原因后重试。", "資料状態の更新に失敗しました。状態と理由を確認して再度お試しください。"),
+        ),
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -1208,7 +1410,7 @@ function RequirementReviewForm({
       <InlineError message={error} />
       <div className="grid gap-2">
         <label className="text-sm font-medium text-slate-700" htmlFor="newStatus">
-          状态
+          {localText(locale, "状态", "状態")}
         </label>
         <select
           id="newStatus"
@@ -1218,17 +1420,19 @@ function RequirementReviewForm({
         >
           {isOfficeRequirement ? (
             <>
-              <option value="submitted">制作中</option>
-              <option value="approved">已完成</option>
-              <option value="not_applicable">已确认</option>
+              <option value="submitted">{localText(locale, "制作中", "作成中")}</option>
+              <option value="approved">{localText(locale, "已完成", "作成済み")}</option>
+              <option value="not_applicable">{localText(locale, "已确认", "確認済み")}</option>
             </>
           ) : (
             <>
-              {!hasUploadedFiles ? <option value="not_submitted">未提交</option> : null}
-              <option value="submitted">已提交</option>
-              <option value="needs_more">需补充</option>
-              <option value="not_applicable">需修改</option>
-              <option value="approved">已通过</option>
+              {!hasUploadedFiles ? (
+                <option value="not_submitted">{localText(locale, "未提交", "未提出")}</option>
+              ) : null}
+              <option value="submitted">{localText(locale, "已提交", "提出済み")}</option>
+              <option value="needs_more">{localText(locale, "需补充", "追加提出")}</option>
+              <option value="not_applicable">{localText(locale, "需修改", "修正依頼")}</option>
+              <option value="approved">{localText(locale, "已通过", "確認済み")}</option>
             </>
           )}
         </select>
@@ -1236,13 +1440,13 @@ function RequirementReviewForm({
       {needsCustomerInstruction ? (
         <div className="grid gap-2">
           <label className="text-sm font-medium text-slate-700" htmlFor="customerInstruction">
-            补充说明
+            {localText(locale, "补充说明", "お客様向け説明")}
           </label>
           <textarea
             id="customerInstruction"
             value={customerInstruction}
             onChange={(event) => setCustomerInstruction(event.target.value)}
-            placeholder="向客户补充说明"
+            placeholder={localText(locale, "向客户补充说明", "お客様への補足説明を入力")}
             className="min-h-24 rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
           />
         </div>
@@ -1250,8 +1454,12 @@ function RequirementReviewForm({
       <FormActions
         isSubmitting={isSubmitting}
         onCancel={onCancel}
-        submitLabel={isOfficeRequirement ? "保存状态" : "保存审核"}
-        submittingLabel="保存中..."
+        submitLabel={
+          isOfficeRequirement
+            ? localText(locale, "保存状态", "状態を保存")
+            : localText(locale, "保存审核", "確認結果を保存")
+        }
+        submittingLabel={localText(locale, "保存中...", "保存中...")}
       />
     </form>
   );
@@ -1270,6 +1478,7 @@ function RequirementNoteForm({
   onSuccess: (result: MutationResult) => Promise<void>;
   onBusyChange: (isBusy: boolean) => void;
 }) {
+  const { locale } = useLanguage();
   const [customerInstruction, setCustomerInstruction] = useState(
     requirement.responsibleParty === "office" ? "" : (requirement.customerInstruction ?? ""),
   );
@@ -1298,11 +1507,16 @@ function RequirementNoteForm({
       await onSuccess({
         message:
           customerInstruction.trim() || internalNote.trim()
-            ? "备注已保存。"
-            : "备注已清空。",
+            ? localText(locale, "备注已保存。", "メモを保存しました。")
+            : localText(locale, "备注已清空。", "メモを削除しました。"),
       });
     } catch (submitError) {
-      setError(toAdminErrorMessage(submitError, "备注保存失败，请稍后重试。"));
+      setError(
+        toAdminErrorMessage(
+          submitError,
+          localText(locale, "备注保存失败，请稍后重试。", "メモの保存に失敗しました。時間をおいて再度お試しください。"),
+        ),
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -1313,33 +1527,33 @@ function RequirementNoteForm({
       <InlineError message={error} />
       <div className="grid gap-2">
         <label className="text-sm font-medium text-slate-700" htmlFor="requirementCustomerInstruction">
-          补充说明
+          {localText(locale, "补充说明", "お客様向け説明")}
         </label>
         <textarea
           id="requirementCustomerInstruction"
           value={customerInstruction}
           onChange={(event) => setCustomerInstruction(event.target.value)}
           className="min-h-28 rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
-          placeholder="向客户补充说明"
+          placeholder={localText(locale, "向客户补充说明", "お客様への補足説明を入力")}
         />
       </div>
       <div className="grid gap-2">
         <label className="text-sm font-medium text-slate-700" htmlFor="requirementInternalNote">
-          内部备注
+          {localText(locale, "内部备注", "内部メモ")}
         </label>
         <textarea
           id="requirementInternalNote"
           value={internalNote}
           onChange={(event) => setInternalNote(event.target.value)}
           className="min-h-28 rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
-          placeholder="仅后台可见，不会显示给客户。"
+          placeholder={localText(locale, "仅后台可见，不会显示给客户。", "管理画面のみに表示され、お客様には表示されません。")}
         />
       </div>
       <FormActions
         isSubmitting={isSubmitting}
         onCancel={onCancel}
-        submitLabel="保存备注"
-        submittingLabel="保存中..."
+        submitLabel={localText(locale, "保存备注", "メモを保存")}
+        submittingLabel={localText(locale, "保存中...", "保存中...")}
       />
     </form>
   );
@@ -1358,6 +1572,7 @@ function RequirementDueDateForm({
   onSuccess: (result: MutationResult) => Promise<void>;
   onBusyChange: (isBusy: boolean) => void;
 }) {
+  const { locale } = useLanguage();
   const [dueDate, setDueDate] = useState(toDateInputValue(requirement.dueDate));
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1378,10 +1593,17 @@ function RequirementDueDateForm({
         dueDate: dueDate || null,
       });
       await onSuccess({
-        message: dueDate ? "截止日期已保存。" : "截止日期已清除。",
+        message: dueDate
+          ? localText(locale, "截止日期已保存。", "提出期限を保存しました。")
+          : localText(locale, "截止日期已清除。", "提出期限を削除しました。"),
       });
     } catch (submitError) {
-      setError(toAdminErrorMessage(submitError, "截止日期保存失败，请稍后重试。"));
+      setError(
+        toAdminErrorMessage(
+          submitError,
+          localText(locale, "截止日期保存失败，请稍后重试。", "提出期限の保存に失敗しました。時間をおいて再度お試しください。"),
+        ),
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -1391,14 +1613,16 @@ function RequirementDueDateForm({
     <form onSubmit={submitDueDate} className="grid gap-4">
       <InlineError message={error} />
       <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
-        <div className="text-xs font-semibold text-slate-500">资料名称</div>
+        <div className="text-xs font-semibold text-slate-500">
+          {localText(locale, "资料名称", "資料名")}
+        </div>
         <div className="mt-1 font-semibold text-slate-950">
-          {displayChineseText(requirement.title)}
+          {displayLocalizedRequirementTitle(requirement.title, locale)}
         </div>
       </div>
       <div className="grid gap-2">
         <label className="text-sm font-medium text-slate-700" htmlFor="requirementDueDateOnly">
-          截止日期
+          {localText(locale, "截止日期", "提出期限")}
         </label>
         <DateTextInput
           id="requirementDueDateOnly"
@@ -1410,8 +1634,8 @@ function RequirementDueDateForm({
       <FormActions
         isSubmitting={isSubmitting}
         onCancel={onCancel}
-        submitLabel="保存截止日期"
-        submittingLabel="保存中..."
+        submitLabel={localText(locale, "保存截止日期", "提出期限を保存")}
+        submittingLabel={localText(locale, "保存中...", "保存中...")}
       />
     </form>
   );
@@ -1428,6 +1652,7 @@ function CustomerEditForm({
   onSuccess: (result: MutationResult) => Promise<void>;
   onBusyChange: (isBusy: boolean) => void;
 }) {
+  const { locale } = useLanguage();
   const [name, setName] = useState(customer.name);
   const [email, setEmail] = useState(customer.email ?? "");
   const [phone, setPhone] = useState(customer.phone ?? "");
@@ -1445,7 +1670,7 @@ function CustomerEditForm({
     setError(null);
 
     if (name.trim().length === 0) {
-      setError("请输入客户姓名。");
+      setError(localText(locale, "请输入客户姓名。", "お客様名を入力してください。"));
       return;
     }
 
@@ -1457,9 +1682,14 @@ function CustomerEditForm({
         phone,
         nationality,
       });
-      await onSuccess({ message: "客户信息已更新。" });
+      await onSuccess({ message: localText(locale, "客户信息已更新。", "お客様情報を更新しました。") });
     } catch (submitError) {
-      setError(toAdminErrorMessage(submitError, "客户信息保存失败，请稍后重试。"));
+      setError(
+        toAdminErrorMessage(
+          submitError,
+          localText(locale, "客户信息保存失败，请稍后重试。", "お客様情報の保存に失敗しました。時間をおいて再度お試しください。"),
+        ),
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -1471,7 +1701,7 @@ function CustomerEditForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="grid gap-2">
           <label className="text-sm font-medium text-slate-700" htmlFor="customerName">
-            姓名
+            {localText(locale, "姓名", "氏名")}
           </label>
           <input
             id="customerName"
@@ -1482,7 +1712,7 @@ function CustomerEditForm({
         </div>
         <div className="grid gap-2">
           <label className="text-sm font-medium text-slate-700" htmlFor="customerEmail">
-            邮箱
+            {localText(locale, "邮箱", "メール")}
           </label>
           <input
             id="customerEmail"
@@ -1494,7 +1724,7 @@ function CustomerEditForm({
         </div>
         <div className="grid gap-2">
           <label className="text-sm font-medium text-slate-700" htmlFor="customerPhone">
-            电话
+            {localText(locale, "电话", "電話番号")}
           </label>
           <input
             id="customerPhone"
@@ -1505,7 +1735,7 @@ function CustomerEditForm({
         </div>
         <div className="grid gap-2">
           <label className="text-sm font-medium text-slate-700" htmlFor="customerNationality">
-            国籍
+            {localText(locale, "国籍", "国籍")}
           </label>
           <input
             id="customerNationality"
@@ -1518,8 +1748,8 @@ function CustomerEditForm({
       <FormActions
         isSubmitting={isSubmitting}
         onCancel={onCancel}
-        submitLabel="保存客户信息"
-        submittingLabel="保存中..."
+        submitLabel={localText(locale, "保存客户信息", "お客様情報を保存")}
+        submittingLabel={localText(locale, "保存中...", "保存中...")}
       />
     </form>
   );
@@ -1538,6 +1768,7 @@ function RequirementUploadForm({
   onSuccess: (result: MutationResult) => Promise<void>;
   onBusyChange: (isBusy: boolean) => void;
 }) {
+  const { locale } = useLanguage();
   const [error, setError] = useState<string | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1552,7 +1783,13 @@ function RequirementUploadForm({
     setError(null);
 
     if (selectedFiles.length === 0) {
-      setError("请选择要上传的文件。可一次选择多个文件。");
+      setError(
+        localText(
+          locale,
+          "请选择要上传的文件。可一次选择多个文件。",
+          "アップロードするファイルを選択してください。複数ファイルをまとめて選択できます。",
+        ),
+      );
       return;
     }
 
@@ -1563,9 +1800,20 @@ function RequirementUploadForm({
     try {
       setIsSubmitting(true);
       await postForm(`/api/admin/requirements/${requirement.id}/files`, uploadForm);
-      await onSuccess({ message: `已上传 ${selectedFiles.length} 个文件。` });
+      await onSuccess({
+        message: localText(
+          locale,
+          `已上传 ${selectedFiles.length} 个文件。`,
+          `${selectedFiles.length} 件のファイルをアップロードしました。`,
+        ),
+      });
     } catch (submitError) {
-      setError(toAdminErrorMessage(submitError, "文件上传失败。请重新选择文件后重试。"));
+      setError(
+        toAdminErrorMessage(
+          submitError,
+          localText(locale, "文件上传失败。请重新选择文件后重试。", "ファイルのアップロードに失敗しました。ファイルを選択し直して再度お試しください。"),
+        ),
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -1580,11 +1828,15 @@ function RequirementUploadForm({
           className="flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-dashed border-blue-200 bg-slate-50 px-4 py-4 transition hover:border-blue-300 hover:bg-blue-50/70"
         >
           <span>
-            <span className="block text-sm font-semibold text-slate-900">选择要上传的文件</span>
-            <span className="mt-1 block text-xs text-slate-500">支持一次选择多个文件</span>
+            <span className="block text-sm font-semibold text-slate-900">
+              {localText(locale, "选择要上传的文件", "アップロードするファイルを選択")}
+            </span>
+            <span className="mt-1 block text-xs text-slate-500">
+              {localText(locale, "支持一次选择多个文件", "複数ファイルをまとめて選択できます")}
+            </span>
           </span>
           <span className="shrink-0 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-blue-100">
-            选择文件
+            {localText(locale, "选择文件", "ファイルを選択")}
           </span>
         </label>
         <input
@@ -1598,13 +1850,15 @@ function RequirementUploadForm({
         {selectedFiles.length > 0 ? (
           <div className="rounded-2xl border border-slate-200 bg-white">
             <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 text-xs font-semibold text-slate-500">
-              <span>已选择 {selectedFiles.length} 个文件</span>
+              <span>
+                {localText(locale, `已选择 ${selectedFiles.length} 个文件`, `${selectedFiles.length} 件のファイルを選択中`)}
+              </span>
               <button
                 type="button"
                 onClick={() => setSelectedFiles([])}
                 className="text-blue-600 hover:text-blue-700"
               >
-                清空
+                {localText(locale, "清空", "クリア")}
               </button>
             </div>
             <div className="divide-y divide-slate-100">
@@ -1617,7 +1871,7 @@ function RequirementUploadForm({
                   <span className="shrink-0 text-xs text-slate-400">{formatFileSize(String(file.size))}</span>
                   <button
                     type="button"
-                    aria-label={`移除 ${file.name}`}
+                    aria-label={localText(locale, `移除 ${file.name}`, `${file.name} を削除`)}
                     onClick={() =>
                       setSelectedFiles((currentFiles) =>
                         currentFiles.filter((_, currentIndex) => currentIndex !== index),
@@ -1636,8 +1890,8 @@ function RequirementUploadForm({
       <FormActions
         isSubmitting={isSubmitting}
         onCancel={onCancel}
-        submitLabel="上传文件"
-        submittingLabel="上传中..."
+        submitLabel={localText(locale, "上传文件", "ファイルをアップロード")}
+        submittingLabel={localText(locale, "上传中...", "アップロード中...")}
       />
     </form>
   );
@@ -1654,6 +1908,7 @@ function ImmigrationRequestForm({
   onSuccess: (result: MutationResult) => Promise<void>;
   onBusyChange: (isBusy: boolean) => void;
 }) {
+  const { locale } = useLanguage();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -1671,7 +1926,7 @@ function ImmigrationRequestForm({
     const responsibleParty = optionalFormString(form, "responsibleParty");
 
     if (!title || (responsibleParty !== "customer" && responsibleParty !== "office")) {
-      setError("请填写标题并选择负责方。");
+      setError(localText(locale, "请填写标题并选择负责方。", "タイトルを入力し、担当区分を選択してください。"));
       return;
     }
 
@@ -1687,9 +1942,14 @@ function ImmigrationRequestForm({
     try {
       setIsSubmitting(true);
       await postJson(`/api/admin/cases/${caseId}/immigration-requests`, body);
-      await onSuccess({ message: "入管追加材料已添加。" });
+      await onSuccess({ message: localText(locale, "入管追加材料已添加。", "入管追加資料を追加しました。") });
     } catch (submitError) {
-      setError(toAdminErrorMessage(submitError, "追加材料创建失败。请检查标题、负责方和日期后重试。"));
+      setError(
+        toAdminErrorMessage(
+          submitError,
+          localText(locale, "追加材料创建失败。请检查标题、负责方和日期后重试。", "追加資料の作成に失敗しました。タイトル、担当区分、日付を確認して再度お試しください。"),
+        ),
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -1700,7 +1960,7 @@ function ImmigrationRequestForm({
       <InlineError message={error} />
       <div className="grid gap-2">
         <label className="text-sm font-medium text-slate-700" htmlFor="immigrationTitle">
-          材料标题
+          {localText(locale, "材料标题", "資料タイトル")}
         </label>
         <input
           id="immigrationTitle"
@@ -1711,7 +1971,7 @@ function ImmigrationRequestForm({
       </div>
       <div className="grid gap-2">
         <label className="text-sm font-medium text-slate-700" htmlFor="responsibleParty">
-          负责方
+          {localText(locale, "负责方", "担当")}
         </label>
         <select
           id="responsibleParty"
@@ -1719,24 +1979,28 @@ function ImmigrationRequestForm({
           defaultValue="customer"
           className="rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
         >
-          <option value="customer">客户</option>
-          <option value="office">事务所</option>
+          <option value="customer">{localText(locale, "客户", "お客様")}</option>
+          <option value="office">{localText(locale, "事务所", "事務所")}</option>
         </select>
       </div>
       <div className="grid gap-2">
         <label className="text-sm font-medium text-slate-700" htmlFor="immigrationCustomerInstruction">
-          补充说明
+          {localText(locale, "补充说明", "お客様向け説明")}
         </label>
         <textarea
           id="immigrationCustomerInstruction"
           name="customerInstruction"
-          placeholder="此说明会显示给客户，请写明需要提交的资料内容和注意事项。"
+          placeholder={localText(
+            locale,
+            "此说明会显示给客户，请写明需要提交的资料内容和注意事项。",
+            "この説明はお客様画面に表示されます。提出が必要な資料内容と注意事項を記載してください。",
+          )}
           className="min-h-20 rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
         />
       </div>
       <div className="grid gap-2">
         <label className="text-sm font-medium text-slate-700" htmlFor="immigrationInternalNote">
-          内部备注
+          {localText(locale, "内部备注", "内部メモ")}
         </label>
         <textarea
           id="immigrationInternalNote"
@@ -1746,7 +2010,7 @@ function ImmigrationRequestForm({
       </div>
       <div className="grid gap-2">
         <label className="text-sm font-medium text-slate-700" htmlFor="immigrationDueDate">
-          截止日期
+          {localText(locale, "截止日期", "提出期限")}
         </label>
         <DateTextInput
           id="immigrationDueDate"
@@ -1758,14 +2022,14 @@ function ImmigrationRequestForm({
       <div className="grid gap-2 text-sm text-slate-600">
         <label className="flex items-center gap-2">
           <input name="setCasePhase" type="checkbox" className="h-4 w-4 rounded border-slate-300" />
-          同时将案件阶段切换为资料收集中
+          {localText(locale, "同时将案件阶段切换为资料收集中", "案件段階も「資料収集中」に変更する")}
         </label>
       </div>
       <FormActions
         isSubmitting={isSubmitting}
         onCancel={onCancel}
-        submitLabel="添加材料"
-        submittingLabel="添加中..."
+        submitLabel={localText(locale, "添加材料", "資料を追加")}
+        submittingLabel={localText(locale, "添加中...", "追加中...")}
       />
     </form>
   );
@@ -1784,6 +2048,7 @@ function CustomRequirementForm({
   onSuccess: (result: MutationResult) => Promise<void>;
   onBusyChange: (isBusy: boolean) => void;
 }) {
+  const { locale } = useLanguage();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -1800,7 +2065,7 @@ function CustomRequirementForm({
     const title = optionalFormString(form, "title");
 
     if (!title) {
-      setError("请填写追加资料名称。");
+      setError(localText(locale, "请填写追加资料名称。", "追加資料名を入力してください。"));
       return;
     }
 
@@ -1813,9 +2078,14 @@ function CustomRequirementForm({
         dueDate:
           responsibleParty === "customer" ? optionalFormString(form, "dueDate") : undefined,
       });
-      await onSuccess({ message: "追加资料已添加。" });
+      await onSuccess({ message: localText(locale, "追加资料已添加。", "追加資料を追加しました。") });
     } catch (submitError) {
-      setError(toAdminErrorMessage(submitError, "追加资料创建失败，请检查资料名称后重试。"));
+      setError(
+        toAdminErrorMessage(
+          submitError,
+          localText(locale, "追加资料创建失败，请检查资料名称后重试。", "追加資料の作成に失敗しました。資料名を確認して再度お試しください。"),
+        ),
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -1826,7 +2096,7 @@ function CustomRequirementForm({
       <InlineError message={error} />
       <div className="grid gap-2">
         <label className="text-sm font-medium text-slate-700" htmlFor="customRequirementTitle">
-          追加资料名称
+          {localText(locale, "追加资料名称", "追加資料名")}
         </label>
         <input
           id="customRequirementTitle"
@@ -1837,19 +2107,23 @@ function CustomRequirementForm({
       </div>
       <div className="grid gap-2">
         <label className="text-sm font-medium text-slate-700" htmlFor="customRequirementInstruction">
-          补充说明
+          {localText(locale, "补充说明", "お客様向け説明")}
         </label>
         <textarea
           id="customRequirementInstruction"
           name="customerInstruction"
-          placeholder="此说明会显示给客户，请写明需要提交的资料内容和注意事项。"
+          placeholder={localText(
+            locale,
+            "此说明会显示给客户，请写明需要提交的资料内容和注意事项。",
+            "この説明はお客様画面に表示されます。提出が必要な資料内容と注意事項を記載してください。",
+          )}
           className="min-h-24 rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
         />
       </div>
       {responsibleParty === "customer" ? (
         <div className="grid gap-2">
           <label className="text-sm font-medium text-slate-700" htmlFor="customRequirementDueDate">
-            截止日期
+            {localText(locale, "截止日期", "提出期限")}
           </label>
           <DateTextInput
             id="customRequirementDueDate"
@@ -1860,14 +2134,14 @@ function CustomRequirementForm({
       ) : null}
       <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
         {responsibleParty === "customer"
-          ? "该资料会显示在客户画面中。"
-          : "该资料只显示在事务所后台。"}
+          ? localText(locale, "该资料会显示在客户画面中。", "この資料はお客様画面に表示されます。")
+          : localText(locale, "该资料只显示在事务所后台。", "この資料は事務所管理画面のみに表示されます。")}
       </div>
       <FormActions
         isSubmitting={isSubmitting}
         onCancel={onCancel}
-        submitLabel="追加资料"
-        submittingLabel="追加中..."
+        submitLabel={localText(locale, "追加资料", "資料を追加")}
+        submittingLabel={localText(locale, "追加中...", "追加中...")}
       />
     </form>
   );
@@ -1880,10 +2154,12 @@ function ChangeHistoryList({
   events: AdminTimelineEvent[];
   requirements: AdminRequirement[];
 }) {
+  const { locale } = useLanguage();
+  const text = getChangeHistoryText(locale);
   const requirementLookup = useMemo(() => buildRequirementLookup(requirements), [requirements]);
 
   if (events.length === 0) {
-    return <p className="text-sm text-slate-500">暂无变更履历。</p>;
+    return <p className="text-sm text-slate-500">{text.empty}</p>;
   }
 
   return (
@@ -1892,10 +2168,10 @@ function ChangeHistoryList({
         <div key={event.id} className="flex flex-wrap items-start justify-between gap-3 py-2.5">
           <div className="min-w-0">
             <div className="break-words text-sm font-medium text-slate-900">
-              {formatChangeHistorySummary(event.summary)}
+              {formatChangeHistorySummary(event.summary, locale)}
             </div>
             <div className="mt-0.5 break-words text-xs leading-5 text-slate-500">
-              {formatChangeHistoryDetail(event, requirementLookup)}
+              {formatChangeHistoryDetail(event, requirementLookup, locale)}
             </div>
           </div>
           <div className="shrink-0 text-xs text-slate-400">{formatDateTime(event.createdAt)}</div>
@@ -1916,6 +2192,8 @@ function ChangeHistoryModal({
   onClose: () => void;
   closeDisabled?: boolean;
 }) {
+  const { locale } = useLanguage();
+  const text = getChangeHistoryText(locale);
   const [openFilter, setOpenFilter] = useState<"requirements" | "time" | null>(null);
   const [selectedRequirementIds, setSelectedRequirementIds] = useState<string[]>([]);
   const [fromDate, setFromDate] = useState("");
@@ -1962,7 +2240,7 @@ function ChangeHistoryModal({
     <Modal
       title={
         <div className="relative flex flex-wrap items-center gap-2">
-          <span>全部变更履历</span>
+          <span>{text.all}</span>
           <div className="relative flex items-center gap-1.5 text-xs font-medium">
             <div className="relative">
               <button
@@ -1975,7 +2253,7 @@ function ChangeHistoryModal({
                     : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50",
                 ].join(" ")}
               >
-                资料名{selectedRequirementIds.length > 0 ? ` ${selectedRequirementIds.length}` : ""}
+                {text.requirementName}{selectedRequirementIds.length > 0 ? ` ${selectedRequirementIds.length}` : ""}
                 <span className="ml-1 text-[9px] text-slate-400">
                   {openFilter === "requirements" ? "▲" : "▼"}
                 </span>
@@ -1983,20 +2261,20 @@ function ChangeHistoryModal({
               {openFilter === "requirements" ? (
                 <div className="absolute left-0 top-full z-10 mt-2 w-[min(420px,calc(100vw-3rem))] rounded-2xl border border-slate-200 bg-white p-2.5 shadow-xl shadow-slate-950/10">
                 <div className="mb-1.5 flex items-center justify-between gap-3">
-                  <div className="text-xs font-semibold text-slate-600">资料名</div>
+                  <div className="text-xs font-semibold text-slate-600">{text.requirementName}</div>
                   {selectedRequirementIds.length > 0 ? (
                     <button
                       type="button"
                       onClick={() => setSelectedRequirementIds([])}
                       className="text-xs font-medium text-blue-700 hover:text-blue-800"
                     >
-                      清除
+                      {text.clear}
                     </button>
                   ) : null}
                 </div>
                 <div className="soft-scrollbar max-h-40 overflow-auto pr-1">
                   {requirements.length === 0 ? (
-                    <p className="px-2 py-1 text-xs text-slate-500">暂无可筛选资料。</p>
+                    <p className="px-2 py-1 text-xs text-slate-500">{text.noFilterableRequirements}</p>
                   ) : (
                     <div className="grid gap-0.5 sm:grid-cols-2">
                       {requirements.map((requirement) => (
@@ -2010,7 +2288,7 @@ function ChangeHistoryModal({
                             onChange={() => toggleRequirement(requirement.id)}
                             className="h-3.5 w-3.5 rounded border-slate-300"
                           />
-                          <span className="truncate">{displayChineseText(requirement.title)}</span>
+                          <span className="truncate">{displayLocalizedRequirementTitle(requirement.title, locale)}</span>
                         </label>
                       ))}
                     </div>
@@ -2030,17 +2308,17 @@ function ChangeHistoryModal({
                     : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50",
                 ].join(" ")}
               >
-                时间
+                {text.time}
                 <span className="ml-1 text-[9px] text-slate-400">
                   {openFilter === "time" ? "▲" : "▼"}
                 </span>
               </button>
               {openFilter === "time" ? (
                 <div className="absolute left-0 top-full z-10 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-2.5 shadow-xl shadow-slate-950/10">
-                <div className="mb-2 text-xs font-semibold text-slate-600">时间筛选</div>
+                <div className="mb-2 text-xs font-semibold text-slate-600">{text.timeFilter}</div>
                 <div className="grid gap-2">
                   <label className="grid gap-1 text-xs font-medium text-slate-500">
-                    开始日期
+                    {text.startDate}
                     <DateTextInput
                       value={fromDate}
                       onChange={(event) => setFromDate(event.target.value)}
@@ -2048,7 +2326,7 @@ function ChangeHistoryModal({
                     />
                   </label>
                   <label className="grid gap-1 text-xs font-medium text-slate-500">
-                    结束日期
+                    {text.endDate}
                     <DateTextInput
                       value={toDate}
                       onChange={(event) => setToDate(event.target.value)}
@@ -2065,7 +2343,7 @@ function ChangeHistoryModal({
                 onClick={clearFilters}
                 className="px-1.5 py-1 text-slate-400 hover:text-slate-700"
               >
-                清除
+                {text.clear}
               </button>
             ) : null}
           </div>
@@ -2076,7 +2354,7 @@ function ChangeHistoryModal({
     >
       <div className="grid h-[min(620px,calc(100vh-10rem))] min-h-[460px] grid-rows-[auto_1fr] gap-4">
         <div className="flex items-center justify-between text-xs text-slate-500">
-          <span>显示 {filteredEvents.length} / {events.length} 条履历</span>
+          <span>{text.count(filteredEvents.length, events.length)}</span>
         </div>
 
         <div className="soft-scrollbar overflow-y-auto pr-1">
@@ -2087,9 +2365,13 @@ function ChangeHistoryModal({
   );
 }
 
-function formatPhaseWarning(warning: CasePhaseWarning): string {
+function formatPhaseWarning(warning: CasePhaseWarning, locale: AppLocale): string {
   if (warning.type === "required_requirements_incomplete") {
-    return `必需资料尚未完成：${warning.count} 项`;
+    return localText(
+      locale,
+      `必需资料尚未完成：${warning.count} 项`,
+      `必須資料が未完了です：${warning.count} 件`,
+    );
   }
 
   return `${warning.type}：${warning.count}`;
@@ -2108,6 +2390,7 @@ function CasePhaseChangeForm({
   onSuccess: (result: MutationResult) => Promise<void>;
   onBusyChange: (isBusy: boolean) => void;
 }) {
+  const { locale } = useLanguage();
   const phaseOptions = useMemo(() => getAllowedCasePhaseOptions(currentPhase), [currentPhase]);
   const defaultNewPhase = phaseOptions[0] ?? "";
   const [newPhase, setNewPhase] = useState(defaultNewPhase);
@@ -2137,24 +2420,29 @@ function CasePhaseChangeForm({
     setError(null);
 
     if (!newPhase) {
-      setError("当前阶段暂无可切换的下一阶段。");
+      setError(localText(locale, "当前阶段暂无可切换的下一阶段。", "現在の段階から変更できる次の段階はありません。"));
       return;
     }
 
     if (!phaseOptions.includes(newPhase)) {
-      setError("请选择不同的案件阶段。");
+      setError(localText(locale, "请选择不同的案件阶段。", "別の案件段階を選択してください。"));
       return;
     }
 
     if (newPhase === currentPhase) {
-      setError("请选择一个不同的案件阶段。");
+      setError(localText(locale, "请选择一个不同的案件阶段。", "現在とは異なる案件段階を選択してください。"));
       return;
     }
 
     if (
       needsConfirmation &&
       !confirmImportantAction(
-        `案件阶段将从“${displayCasePhaseLabel(currentPhase)}”切换为“${displayCasePhaseLabel(newPhase)}”。`,
+        localText(
+          locale,
+          `案件阶段将从“${displayCasePhaseLabel(currentPhase, locale)}”切换为“${displayCasePhaseLabel(newPhase, locale)}”。`,
+          `案件段階を「${displayCasePhaseLabel(currentPhase, locale)}」から「${displayCasePhaseLabel(newPhase, locale)}」へ変更します。`,
+        ),
+        locale,
       )
     ) {
       return;
@@ -2174,15 +2462,23 @@ function CasePhaseChangeForm({
       );
       const warningMessage =
         result.warnings.length > 0
-          ? `提示：${result.warnings.map(formatPhaseWarning).join(" / ")}`
+          ? localText(
+              locale,
+              `提示：${result.warnings.map((warning) => formatPhaseWarning(warning, locale)).join(" / ")}`,
+              `注意：${result.warnings.map((warning) => formatPhaseWarning(warning, locale)).join(" / ")}`,
+            )
           : undefined;
 
       await onSuccess({
-        message: `案件阶段已从 ${displayCasePhaseLabel(result.oldPhase)} 切换为 ${displayCasePhaseLabel(result.newPhase)}。`,
+        message: localText(
+          locale,
+          `案件阶段已从 ${displayCasePhaseLabel(result.oldPhase, locale)} 切换为 ${displayCasePhaseLabel(result.newPhase, locale)}。`,
+          `案件段階を ${displayCasePhaseLabel(result.oldPhase, locale)} から ${displayCasePhaseLabel(result.newPhase, locale)} へ変更しました。`,
+        ),
         warningMessage,
       });
     } catch (submitError) {
-      setError(formatCasePhaseSubmitError(submitError));
+      setError(formatCasePhaseSubmitError(submitError, locale));
     } finally {
       setIsSubmitting(false);
     }
@@ -2193,7 +2489,7 @@ function CasePhaseChangeForm({
       <InlineError message={error} />
       <div className="grid gap-2">
         <label className="text-sm font-medium text-slate-700" htmlFor="newPhase">
-          新案件阶段
+          {localText(locale, "新案件阶段", "新しい案件段階")}
         </label>
         <select
           id="newPhase"
@@ -2203,32 +2499,38 @@ function CasePhaseChangeForm({
           className="rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
         >
           <option value="" disabled>
-            请选择案件阶段
+            {localText(locale, "请选择案件阶段", "案件段階を選択してください")}
           </option>
           {phaseOptions.map((phase) => (
             <option key={phase} value={phase}>
-              {displayCasePhaseLabel(phase)}
+              {displayCasePhaseLabel(phase, locale)}
             </option>
           ))}
         </select>
         {phaseOptions.length > 0 ? (
-          <p className="text-xs text-slate-500">可选择任意其他案件阶段。</p>
+          <p className="text-xs text-slate-500">
+            {localText(locale, "可选择任意其他案件阶段。", "現在とは異なる任意の案件段階を選択できます。")}
+          </p>
         ) : (
-          <p className="text-xs text-slate-500">暂无可切换的案件阶段。</p>
+          <p className="text-xs text-slate-500">
+            {localText(locale, "暂无可切换的案件阶段。", "変更できる案件段階はありません。")}
+          </p>
         )}
         {needsConfirmation ? (
-          <p className="text-xs text-amber-700">该阶段切换提交前会要求确认，建议填写原因。</p>
+          <p className="text-xs text-amber-700">
+            {localText(locale, "该阶段切换提交前会要求确认，建议填写原因。", "この段階変更は送信前に確認が必要です。理由の入力を推奨します。")}
+          </p>
         ) : null}
       </div>
       <div className="grid gap-2">
         <label className="text-sm font-medium text-slate-700" htmlFor="phaseReason">
-          原因
+          {localText(locale, "原因", "理由")}
         </label>
         <input
           id="phaseReason"
           value={reason}
           onChange={(event) => setReason(event.target.value)}
-          placeholder="可选；回退或审查完了时建议填写"
+          placeholder={localText(locale, "可选；回退或审查完了时建议填写", "任意。差戻し又は審査完了時は入力を推奨します")}
           className="rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
         />
       </div>
@@ -2236,7 +2538,7 @@ function CasePhaseChangeForm({
         <div className="grid gap-3 md:grid-cols-2">
           <div className="grid gap-2">
             <label className="text-sm font-medium text-slate-700" htmlFor="submittedAt">
-              提交日期
+              {localText(locale, "提交日期", "提出日")}
             </label>
             <DateTextInput
               id="submittedAt"
@@ -2247,7 +2549,7 @@ function CasePhaseChangeForm({
           </div>
           <div className="grid gap-2">
             <label className="text-sm font-medium text-slate-700" htmlFor="submissionNumber">
-              受理号
+              {localText(locale, "受理号", "受付番号")}
             </label>
             <input
               id="submissionNumber"
@@ -2261,7 +2563,7 @@ function CasePhaseChangeForm({
       {newPhase === "approved" ? (
         <div className="grid gap-2">
           <label className="text-sm font-medium text-slate-700" htmlFor="resultAt">
-            结果日期
+            {localText(locale, "结果日期", "結果日")}
           </label>
           <DateTextInput
             id="resultAt"
@@ -2274,8 +2576,8 @@ function CasePhaseChangeForm({
       <FormActions
         isSubmitting={isSubmitting}
         onCancel={onCancel}
-        submitLabel="切换阶段"
-        submittingLabel="切换中..."
+        submitLabel={localText(locale, "切换阶段", "段階を変更")}
+        submittingLabel={localText(locale, "切换中...", "変更中...")}
       />
     </form>
   );
@@ -2292,6 +2594,7 @@ function ApplicationConfirmationForm({
   onSuccess: (result: MutationResult) => Promise<void>;
   onBusyChange: (isBusy: boolean) => void;
 }) {
+  const { locale } = useLanguage();
   const [title, setTitle] = useState("");
   const [version, setVersion] = useState("");
   const [storageBucket, setStorageBucket] = useState("");
@@ -2317,7 +2620,7 @@ function ApplicationConfirmationForm({
     const parsedVersion = version.trim().length > 0 ? Number(version) : undefined;
 
     if (!normalizedTitle || !normalizedStorageBucket || !normalizedStoragePath) {
-      setError("请填写标题、storage bucket 和 storage path。");
+      setError(localText(locale, "请填写标题、storage bucket 和 storage path。", "タイトル、storage bucket、storage path を入力してください。"));
       return;
     }
 
@@ -2325,13 +2628,16 @@ function ApplicationConfirmationForm({
       parsedVersion !== undefined &&
       (!Number.isInteger(parsedVersion) || parsedVersion <= 0)
     ) {
-      setError("版本号必须是正整数。");
+      setError(localText(locale, "版本号必须是正整数。", "バージョン番号は正の整数で入力してください。"));
       return;
     }
 
     if (
       supersedePendingVersions &&
-      !confirmImportantAction("旧的 pending 申请书确认版本会被标记为 superseded。")
+      !confirmImportantAction(
+        localText(locale, "旧的 pending 申请书确认版本会被标记为 superseded。", "既存の pending 状態の確認資料バージョンは superseded として扱われます。"),
+        locale,
+      )
     ) {
       return;
     }
@@ -2351,10 +2657,19 @@ function ApplicationConfirmationForm({
       );
 
       await onSuccess({
-        message: `申请书确认版本已创建：${result.title} v${result.version}。`,
+        message: localText(
+          locale,
+          `申请书确认版本已创建：${result.title} v${result.version}。`,
+          `確認資料バージョンを作成しました：${result.title} v${result.version}。`,
+        ),
       });
     } catch (submitError) {
-      setError(toAdminErrorMessage(submitError, "申请书确认版本创建失败。请检查文件登记信息后重试。"));
+      setError(
+        toAdminErrorMessage(
+          submitError,
+          localText(locale, "申请书确认版本创建失败。请检查文件登记信息后重试。", "確認資料バージョンの作成に失敗しました。ファイル登録情報を確認して再度お試しください。"),
+        ),
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -2364,12 +2679,15 @@ function ApplicationConfirmationForm({
     <form onSubmit={submitConfirmation} className="grid gap-4">
       <InlineError message={error} />
       <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3 text-sm leading-6 text-blue-900">
-        当前只是登记已存在的确认文件，不是上传文件。storage bucket 和 storage path
-        必须对应已经存在的文件；本操作不会生成预览或下载链接。
+        {localText(
+          locale,
+          "当前只是登记已存在的确认文件，不是上传文件。storage bucket 和 storage path 必须对应已经存在的文件；本操作不会生成预览或下载链接。",
+          "この操作は既存の確認ファイルを登録するものです。ファイルアップロードではありません。storage bucket と storage path は既に存在するファイルに対応している必要があり、この操作ではプレビュー又はダウンロードリンクは生成されません。",
+        )}
       </div>
       <div className="grid gap-2">
         <label className="text-sm font-medium text-slate-700" htmlFor="confirmationTitle">
-          标题
+          {localText(locale, "标题", "タイトル")}
         </label>
         <input
           id="confirmationTitle"
@@ -2381,20 +2699,20 @@ function ApplicationConfirmationForm({
       <div className="grid gap-3 md:grid-cols-2">
         <div className="grid gap-2">
           <label className="text-sm font-medium text-slate-700" htmlFor="confirmationVersion">
-            版本号
+            {localText(locale, "版本号", "バージョン番号")}
           </label>
           <input
             id="confirmationVersion"
             value={version}
             onChange={(event) => setVersion(event.target.value)}
             inputMode="numeric"
-            placeholder="可选；不填则自动递增"
+            placeholder={localText(locale, "可选；不填则自动递增", "任意。未入力の場合は自動採番")}
             className="rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
           />
         </div>
         <div className="grid gap-2">
           <label className="text-sm font-medium text-slate-700" htmlFor="confirmationReason">
-            原因
+            {localText(locale, "原因", "理由")}
           </label>
           <input
             id="confirmationReason"
@@ -2433,17 +2751,67 @@ function ApplicationConfirmationForm({
           onChange={(event) => setSupersedePendingVersions(event.target.checked)}
           className="h-4 w-4 rounded border-slate-300"
         />
-        将旧的 pending 版本标记为 superseded
+        {localText(locale, "将旧的 pending 版本标记为 superseded", "既存の pending バージョンを superseded にする")}
       </label>
       <FormActions
         isSubmitting={isSubmitting}
         onCancel={onCancel}
-        submitLabel="创建确认版本"
-        submittingLabel="创建中..."
+        submitLabel={localText(locale, "创建确认版本", "確認バージョンを作成")}
+        submittingLabel={localText(locale, "创建中...", "作成中...")}
       />
     </form>
   );
 }
+
+const tokenRegenerateFormText = {
+  zh: {
+    confirm:
+      "旧的有效客户访问链接会失效。新的客户访问链接只会显示一次，请准备好立即复制。",
+    success: "客户访问链接已重新生成。请立即复制新的客户链接。",
+    error: "客户访问链接重新生成失败。请稍后重试。",
+    copied: "已复制到剪贴板。",
+    copyFailed: "复制失败，请手动选择访问链接。",
+    warning: "重新生成会让旧的客户访问链接失效。新的客户链接只在本窗口显示一次，关闭后无法再次查看。",
+    reason: "原因",
+    reasonPlaceholder: "可选，写入安全的操作原因",
+    expiresAt: "过期时间",
+    oneTimeTitle: "客户访问链接只显示一次。",
+    oneTimeDescription: "请现在复制并交给客户，关闭弹窗后无法再次查看。",
+    newTokenId: "新访问令牌 ID：",
+    previousTokenId: "旧访问令牌 ID：",
+    none: "无",
+    expiry: "有效期：",
+    copyLink: "复制客户链接",
+    close: "关闭",
+    submit: "重新生成链接",
+    submitAgain: "再次重新生成",
+    submitting: "重新生成中...",
+  },
+  ja: {
+    confirm:
+      "現在有効なお客様リンクは失効します。新しいお客様リンクは一度だけ表示されるため、すぐにコピーできる状態で続行してください。",
+    success: "お客様リンクを再生成しました。新しいリンクをすぐにコピーしてください。",
+    error: "お客様リンクの再生成に失敗しました。時間をおいて再度お試しください。",
+    copied: "クリップボードにコピーしました。",
+    copyFailed: "コピーに失敗しました。リンクを手動で選択してコピーしてください。",
+    warning:
+      "再生成すると旧お客様リンクは失効します。新しいお客様リンクはこの画面で一度だけ表示され、閉じた後は再確認できません。",
+    reason: "理由",
+    reasonPlaceholder: "任意。安全に保存できる操作理由を入力してください",
+    expiresAt: "有効期限",
+    oneTimeTitle: "お客様リンクは一度だけ表示されます。",
+    oneTimeDescription: "今すぐコピーしてお客様へ共有してください。画面を閉じると再確認できません。",
+    newTokenId: "新しいアクセストークン ID：",
+    previousTokenId: "旧アクセストークン ID：",
+    none: "なし",
+    expiry: "有効期限：",
+    copyLink: "お客様リンクをコピー",
+    close: "閉じる",
+    submit: "リンクを再生成",
+    submitAgain: "もう一度再生成",
+    submitting: "再生成中...",
+  },
+} as const;
 
 function TokenRegenerateForm({
   caseId,
@@ -2456,6 +2824,8 @@ function TokenRegenerateForm({
   onSuccess: (result: MutationResult) => Promise<void>;
   onBusyChange: (isBusy: boolean) => void;
 }) {
+  const { locale } = useLanguage();
+  const text = tokenRegenerateFormText[locale];
   const [reason, setReason] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const [regeneratedToken, setRegeneratedToken] =
@@ -2474,11 +2844,7 @@ function TokenRegenerateForm({
     setError(null);
     setCopyMessage(null);
 
-    if (
-      !confirmImportantAction(
-        "旧的有效客户访问链接会失效。新的客户访问链接只会显示一次，请准备好立即复制。",
-      )
-    ) {
+    if (!confirmImportantAction(text.confirm, locale)) {
       return;
     }
 
@@ -2493,9 +2859,9 @@ function TokenRegenerateForm({
       );
 
       setRegeneratedToken(result);
-      await onSuccess({ message: "客户访问链接已重新生成。请立即复制新的客户链接。" });
+      await onSuccess({ message: text.success });
     } catch (submitError) {
-      setError(toAdminErrorMessage(submitError, "客户访问链接重新生成失败。请稍后重试。"));
+      setError(toAdminErrorMessage(submitError, text.error));
     } finally {
       setIsSubmitting(false);
     }
@@ -2508,9 +2874,9 @@ function TokenRegenerateForm({
 
     try {
       await navigator.clipboard.writeText(createPortalAccessUrl(regeneratedToken.plaintextToken));
-      setCopyMessage("已复制到剪贴板。");
+      setCopyMessage(text.copied);
     } catch {
-      setCopyMessage("复制失败，请手动选择访问链接。");
+      setCopyMessage(text.copyFailed);
     }
   }
 
@@ -2518,23 +2884,23 @@ function TokenRegenerateForm({
     <form onSubmit={submitRegenerate} className="grid gap-4">
       <InlineError message={error} />
       <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">
-        重新生成会让旧的客户访问链接失效。新的客户链接只在本窗口显示一次，关闭后无法再次查看。
+        {text.warning}
       </div>
       <div className="grid gap-2">
         <label className="text-sm font-medium text-slate-700" htmlFor="tokenRegenerateReason">
-          原因
+          {text.reason}
         </label>
         <input
           id="tokenRegenerateReason"
           value={reason}
           onChange={(event) => setReason(event.target.value)}
-          placeholder="可选，写入安全的操作原因"
+          placeholder={text.reasonPlaceholder}
           className="rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
         />
       </div>
       <div className="grid gap-2">
         <label className="text-sm font-medium text-slate-700" htmlFor="tokenRegenerateExpiresAt">
-          过期时间
+          {text.expiresAt}
         </label>
         <DateTextInput
           id="tokenRegenerateExpiresAt"
@@ -2547,17 +2913,26 @@ function TokenRegenerateForm({
 
       {regeneratedToken ? (
           <div className="grid gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 shadow-sm">
-            <div>
-            <div className="text-base font-semibold">客户访问链接只显示一次。</div>
-            <div className="mt-1 text-amber-800">请现在复制并交给客户，关闭弹窗后无法再次查看。</div>
+          <div>
+            <div className="text-base font-semibold">{text.oneTimeTitle}</div>
+            <div className="mt-1 text-amber-800">{text.oneTimeDescription}</div>
           </div>
           <div className="break-all rounded-xl border border-amber-300 bg-white p-3 font-mono text-xs text-slate-900 shadow-inner">
             {createPortalAccessUrl(regeneratedToken.plaintextToken)}
           </div>
           <div className="grid gap-1 text-xs text-amber-800">
-            <div>新访问令牌 ID：{regeneratedToken.newTokenId}</div>
-            <div>旧访问令牌 ID：{regeneratedToken.previousTokenId ?? "无"}</div>
-            <div>有效期：{formatDateTime(regeneratedToken.expiresAt)}</div>
+            <div>
+              {text.newTokenId}
+              {regeneratedToken.newTokenId}
+            </div>
+            <div>
+              {text.previousTokenId}
+              {regeneratedToken.previousTokenId ?? text.none}
+            </div>
+            <div>
+              {text.expiry}
+              {formatDateTime(regeneratedToken.expiresAt)}
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <button
@@ -2565,7 +2940,7 @@ function TokenRegenerateForm({
               onClick={copyPortalLink}
               className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
             >
-              复制客户链接
+              {text.copyLink}
             </button>
             {copyMessage ? <span className="text-sm text-amber-800">{copyMessage}</span> : null}
           </div>
@@ -2573,15 +2948,41 @@ function TokenRegenerateForm({
       ) : null}
 
       <FormActions
-        cancelLabel="关闭"
+        cancelLabel={text.close}
         isSubmitting={isSubmitting}
         onCancel={onCancel}
-        submitLabel={regeneratedToken ? "再次重新生成" : "重新生成链接"}
-        submittingLabel="重新生成中..."
+        submitLabel={regeneratedToken ? text.submitAgain : text.submit}
+        submittingLabel={text.submitting}
       />
     </form>
   );
 }
+
+const tokenRevokeFormText = {
+  zh: {
+    confirm: "撤销后，客户访问链接会失效。",
+    success: (tokenId: string) => `客户访问链接已撤销：${tokenId}。`,
+    noActiveToken: "当前没有有效访问令牌，无需撤销。",
+    error: "客户访问链接撤销失败。请稍后重试。",
+    warning: "撤销后，客户将无法继续使用当前访问链接查看案件。此操作不会显示或返回明文访问令牌。",
+    reason: "原因",
+    reasonPlaceholder: "可选，写入安全的操作原因",
+    submit: "撤销链接",
+    submitting: "撤销中...",
+  },
+  ja: {
+    confirm: "取り消すと、お客様リンクは失効します。",
+    success: (tokenId: string) => `お客様リンクを取り消しました：${tokenId}。`,
+    noActiveToken: "現在有効なアクセストークンはありません。取り消しは不要です。",
+    error: "お客様リンクの取り消しに失敗しました。時間をおいて再度お試しください。",
+    warning:
+      "取り消すと、お客様は現在のリンクで案件を閲覧できなくなります。この操作では平文アクセストークンは表示・返却されません。",
+    reason: "理由",
+    reasonPlaceholder: "任意。安全に保存できる操作理由を入力してください",
+    submit: "リンクを取り消す",
+    submitting: "取り消し中...",
+  },
+} as const;
 
 function TokenRevokeForm({
   caseId,
@@ -2594,6 +2995,8 @@ function TokenRevokeForm({
   onSuccess: (result: MutationResult) => Promise<void>;
   onBusyChange: (isBusy: boolean) => void;
 }) {
+  const { locale } = useLanguage();
+  const text = tokenRevokeFormText[locale];
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -2607,7 +3010,7 @@ function TokenRevokeForm({
     event.preventDefault();
     setError(null);
 
-    if (!confirmImportantAction("撤销后，客户访问链接会失效。")) {
+    if (!confirmImportantAction(text.confirm, locale)) {
       return;
     }
 
@@ -2622,11 +3025,11 @@ function TokenRevokeForm({
 
       await onSuccess({
         message: result.revokedTokenId
-          ? `客户访问链接已撤销：${result.revokedTokenId}。`
-          : "当前没有有效访问令牌，无需撤销。",
+          ? text.success(result.revokedTokenId)
+          : text.noActiveToken,
       });
     } catch (submitError) {
-      setError(toAdminErrorMessage(submitError, "客户访问链接撤销失败。请稍后重试。"));
+      setError(toAdminErrorMessage(submitError, text.error));
     } finally {
       setIsSubmitting(false);
     }
@@ -2636,25 +3039,25 @@ function TokenRevokeForm({
     <form onSubmit={submitRevoke} className="grid gap-4">
       <InlineError message={error} />
       <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-sm leading-6 text-rose-900">
-        撤销后，客户将无法继续使用当前访问链接查看案件。此操作不会显示或返回明文访问令牌。
+        {text.warning}
       </div>
       <div className="grid gap-2">
         <label className="text-sm font-medium text-slate-700" htmlFor="tokenRevokeReason">
-          原因
+          {text.reason}
         </label>
         <input
           id="tokenRevokeReason"
           value={reason}
           onChange={(event) => setReason(event.target.value)}
-          placeholder="可选，写入安全的操作原因"
+          placeholder={text.reasonPlaceholder}
           className="rounded-2xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
         />
       </div>
       <FormActions
         isSubmitting={isSubmitting}
         onCancel={onCancel}
-        submitLabel="撤销链接"
-        submittingLabel="撤销中..."
+        submitLabel={text.submit}
+        submittingLabel={text.submitting}
         submitTone="rose"
       />
     </form>
@@ -2716,7 +3119,12 @@ export function AdminCaseDetailPage({ caseId }: Props) {
         await loadCase();
       } catch (loadError) {
         if (isMounted) {
-          setError(toAdminErrorMessage(loadError, "案件加载失败。请确认 caseId 是否正确。"));
+          setError(
+            toAdminErrorMessage(
+              loadError,
+              localText(locale, "案件加载失败。请确认 caseId 是否正确。", "案件の読み込みに失敗しました。caseId が正しいか確認してください。"),
+            ),
+          );
           setIsLoading(false);
         }
       }
@@ -2727,7 +3135,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
     return () => {
       isMounted = false;
     };
-  }, [loadCase]);
+  }, [loadCase, locale]);
 
   const scrollToRequirementFromHash = useCallback(() => {
     const requirementId = getRequirementIdFromHash();
@@ -2776,7 +3184,12 @@ export function AdminCaseDetailPage({ caseId }: Props) {
     try {
       await loadCase();
     } catch (loadError) {
-      setError(toAdminErrorMessage(loadError, "案件刷新失败。请手动刷新页面。"));
+      setError(
+        toAdminErrorMessage(
+          loadError,
+          localText(locale, "案件刷新失败。请手动刷新页面。", "案件の再読み込みに失敗しました。手動でページを更新してください。"),
+        ),
+      );
       setIsLoading(false);
     }
   }
@@ -2788,7 +3201,12 @@ export function AdminCaseDetailPage({ caseId }: Props) {
     try {
       await loadCase();
     } catch (loadError) {
-      setError(toAdminErrorMessage(loadError, "案件刷新失败。请手动刷新页面。"));
+      setError(
+        toAdminErrorMessage(
+          loadError,
+          localText(locale, "案件刷新失败。请手动刷新页面。", "案件の再読み込みに失敗しました。手動でページを更新してください。"),
+        ),
+      );
       setIsLoading(false);
     }
   }
@@ -2807,7 +3225,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
           fileUrl: result.signedUrl,
           fileName: file.originalFileName,
         });
-        setMessage("文件下载已开始。");
+        setMessage(localText(locale, "文件下载已开始。", "ファイルのダウンロードを開始しました。"));
         return;
       }
 
@@ -2817,7 +3235,12 @@ export function AdminCaseDetailPage({ caseId }: Props) {
         expiresAt: result.expiresAt,
       });
     } catch (previewError) {
-      setError(toAdminErrorMessage(previewError, "文件预览链接生成失败，请稍后重试。"));
+      setError(
+        toAdminErrorMessage(
+          previewError,
+          localText(locale, "文件预览链接生成失败，请稍后重试。", "ファイルプレビューリンクの生成に失敗しました。時間をおいて再度お試しください。"),
+        ),
+      );
     }
   }
 
@@ -2843,7 +3266,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
           fileUrl: result.signedUrl,
           fileName: file.originalFileName,
         });
-        setMessage("文件下载已开始。");
+        setMessage(localText(locale, "文件下载已开始。", "ファイルのダウンロードを開始しました。"));
         return;
       }
 
@@ -2854,9 +3277,20 @@ export function AdminCaseDetailPage({ caseId }: Props) {
         blob: archive,
         fileName: `${requirement.title || "files"}.zip`,
       });
-      setMessage(`已开始下载 ${uploadedFiles.length} 个文件的压缩包。`);
+      setMessage(
+        localText(
+          locale,
+          `已开始下载 ${uploadedFiles.length} 个文件的压缩包。`,
+          `${uploadedFiles.length} 件のファイルをまとめた zip のダウンロードを開始しました。`,
+        ),
+      );
     } catch (downloadError) {
-      setError(toAdminErrorMessage(downloadError, "部分文件下载链接生成失败，请稍后重试。"));
+      setError(
+        toAdminErrorMessage(
+          downloadError,
+          localText(locale, "部分文件下载链接生成失败，请稍后重试。", "一部ファイルのダウンロードリンク生成に失敗しました。時間をおいて再度お試しください。"),
+        ),
+      );
     } finally {
       setDownloadingRequirementId(null);
     }
@@ -2869,11 +3303,16 @@ export function AdminCaseDetailPage({ caseId }: Props) {
 
     try {
       await deleteJson(`/api/admin/files/${file.id}`);
-      setMessage("文件已删除。");
+      setMessage(localText(locale, "文件已删除。", "ファイルを削除しました。"));
       setFileDeleteConfirmation(null);
       await loadCase();
     } catch (deleteError) {
-      setFileDeleteError(toAdminErrorMessage(deleteError, "文件删除失败，请稍后重试。"));
+      setFileDeleteError(
+        toAdminErrorMessage(
+          deleteError,
+          localText(locale, "文件删除失败，请稍后重试。", "ファイルの削除に失敗しました。時間をおいて再度お試しください。"),
+        ),
+      );
     } finally {
       setDeletingFileId(null);
     }
@@ -2892,11 +3331,22 @@ export function AdminCaseDetailPage({ caseId }: Props) {
 
     try {
       await deleteJson(`/api/admin/requirements/${requirement.id}/files`);
-      setMessage(`已删除 ${uploadedFiles.length} 个文件。`);
+      setMessage(
+        localText(
+          locale,
+          `已删除 ${uploadedFiles.length} 个文件。`,
+          `${uploadedFiles.length} 件のファイルを削除しました。`,
+        ),
+      );
       setFileDeleteConfirmation(null);
       await loadCase();
     } catch (deleteError) {
-      setFileDeleteError(toAdminErrorMessage(deleteError, "全部删除失败，请稍后重试。"));
+      setFileDeleteError(
+        toAdminErrorMessage(
+          deleteError,
+          localText(locale, "全部删除失败，请稍后重试。", "すべてのファイル削除に失敗しました。時間をおいて再度お試しください。"),
+        ),
+      );
     } finally {
       setDeletingRequirementId(null);
     }
@@ -2964,11 +3414,16 @@ export function AdminCaseDetailPage({ caseId }: Props) {
       await deleteJson(`/api/admin/requirements/${requirement.id}`, {
         caseId,
       });
-      setMessage("资料已删除。");
+      setMessage(localText(locale, "资料已删除。", "資料を削除しました。"));
       setRequirementDeleteConfirmation(null);
       await loadCase();
     } catch (deleteError) {
-      setRequirementDeleteError(toAdminErrorMessage(deleteError, "资料删除失败，请稍后重试。"));
+      setRequirementDeleteError(
+        toAdminErrorMessage(
+          deleteError,
+          localText(locale, "资料删除失败，请稍后重试。", "資料の削除に失敗しました。時間をおいて再度お試しください。"),
+        ),
+      );
     } finally {
       setDeletingRequirementRecordId(null);
     }
@@ -3005,7 +3460,12 @@ export function AdminCaseDetailPage({ caseId }: Props) {
       router.push("/admin/cases");
       router.refresh();
     } catch (deleteError) {
-      setCaseDeleteError(toAdminErrorMessage(deleteError, "案件删除失败，请稍后重试。"));
+      setCaseDeleteError(
+        toAdminErrorMessage(
+          deleteError,
+          localText(locale, "案件删除失败，请稍后重试。", "案件の削除に失敗しました。時間をおいて再度お試しください。"),
+        ),
+      );
     } finally {
       setIsDeletingCase(false);
     }
@@ -3126,7 +3586,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
               <div>
                 <h2 className="break-words text-2xl font-semibold text-slate-950">{caseDetail.caseNumber}</h2>
                 <p className="mt-1 text-sm text-slate-600">
-                  {formatVisaBusinessSummary(caseDetail.currentVisaType, caseDetail.targetVisaType)}
+                  {formatVisaBusinessSummary(caseDetail.currentVisaType, caseDetail.targetVisaType, locale)}
                 </p>
               </div>
               <StatusBadge
@@ -3649,13 +4109,13 @@ export function AdminCaseDetailPage({ caseId }: Props) {
         <Modal
           title={
             fileDeleteConfirmation.type === "single"
-              ? "确认删除文件"
-              : "确认删除全部文件"
+              ? localText(locale, "确认删除文件", "ファイル削除の確認")
+              : localText(locale, "确认删除全部文件", "すべてのファイル削除の確認")
           }
           description={
             fileDeleteConfirmation.type === "single"
               ? displayChineseText(fileDeleteConfirmation.file.originalFileName)
-              : displayChineseText(fileDeleteConfirmation.requirement.title)
+              : displayLocalizedRequirementTitle(fileDeleteConfirmation.requirement.title, locale)
           }
           onClose={closeFileDeleteConfirmation}
           closeDisabled={Boolean(deletingFileId || deletingRequirementId)}
@@ -3665,12 +4125,19 @@ export function AdminCaseDetailPage({ caseId }: Props) {
             <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-900">
               {fileDeleteConfirmation.type === "single" ? (
                 <>
-                  确定删除这个已上传文件吗？删除后，该文件不会再出现在客户或后台文件列表中。
+                  {localText(
+                    locale,
+                    "确定删除这个已上传文件吗？删除后，该文件不会再出现在客户或后台文件列表中。",
+                    "このアップロード済みファイルを削除しますか。削除後、このファイルはお客様画面及び管理画面のファイル一覧に表示されません。",
+                  )}
                 </>
               ) : (
                 <>
-                  确定删除该材料下全部 {fileDeleteConfirmation.fileCount} 个已上传文件吗？
-                  删除后，这些文件不会再出现在客户或后台文件列表中。
+                  {localText(
+                    locale,
+                    `确定删除该材料下全部 ${fileDeleteConfirmation.fileCount} 个已上传文件吗？删除后，这些文件不会再出现在客户或后台文件列表中。`,
+                    `この資料に紐づくアップロード済みファイル ${fileDeleteConfirmation.fileCount} 件をすべて削除しますか。削除後、これらのファイルはお客様画面及び管理画面のファイル一覧に表示されません。`,
+                  )}
                 </>
               )}
             </div>
@@ -3681,7 +4148,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                 onClick={closeFileDeleteConfirmation}
                 className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 sm:w-auto"
               >
-                取消
+                {localText(locale, "取消", "キャンセル")}
               </button>
               <button
                 type="button"
@@ -3690,7 +4157,9 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                 className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto"
               >
                 {deletingFileId || deletingRequirementId ? <SubmitSpinner /> : null}
-                {deletingFileId || deletingRequirementId ? "删除中..." : "确认删除"}
+                {deletingFileId || deletingRequirementId
+                  ? localText(locale, "删除中...", "削除中...")
+                  : localText(locale, "确认删除", "削除する")}
               </button>
             </div>
           </div>
@@ -3699,17 +4168,25 @@ export function AdminCaseDetailPage({ caseId }: Props) {
 
       {requirementDeleteConfirmation ? (
         <Modal
-          title="确认删除资料"
-          description={displayChineseText(requirementDeleteConfirmation.requirement.title)}
+          title={localText(locale, "确认删除资料", "資料削除の確認")}
+          description={displayLocalizedRequirementTitle(requirementDeleteConfirmation.requirement.title, locale)}
           onClose={closeRequirementDeleteConfirmation}
           closeDisabled={Boolean(deletingRequirementRecordId)}
         >
           <div className="grid gap-4">
             <InlineError message={requirementDeleteError} />
             <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-900">
-              确定删除该资料吗？删除后，该资料项、已上传文件、内部备注和相关文件记录都会从案件中移除。
+              {localText(
+                locale,
+                "确定删除该资料吗？删除后，该资料项、已上传文件、内部备注和相关文件记录都会从案件中移除。",
+                "この資料を削除しますか。削除後、この資料項目、アップロード済みファイル、内部メモ、関連ファイル記録は案件から削除されます。",
+              )}
               {requirementDeleteConfirmation.uploadedFileCount > 0
-                ? ` 当前包含 ${requirementDeleteConfirmation.uploadedFileCount} 个已上传文件。`
+                ? localText(
+                    locale,
+                    ` 当前包含 ${requirementDeleteConfirmation.uploadedFileCount} 个已上传文件。`,
+                    ` 現在、アップロード済みファイルが ${requirementDeleteConfirmation.uploadedFileCount} 件含まれています。`,
+                  )
                 : null}
             </div>
             <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
@@ -3719,7 +4196,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                 onClick={closeRequirementDeleteConfirmation}
                 className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 sm:w-auto"
               >
-                取消
+                {localText(locale, "取消", "キャンセル")}
               </button>
               <button
                 type="button"
@@ -3728,7 +4205,9 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                 className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto"
               >
                 {deletingRequirementRecordId ? <SubmitSpinner /> : null}
-                {deletingRequirementRecordId ? "删除中..." : "确认删除"}
+                {deletingRequirementRecordId
+                  ? localText(locale, "删除中...", "削除中...")
+                  : localText(locale, "确认删除", "削除する")}
               </button>
             </div>
           </div>
@@ -3737,7 +4216,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
 
       {caseDeleteConfirmation && caseDetail ? (
         <Modal
-          title="确认删除案件"
+          title={localText(locale, "确认删除案件", "案件削除の確認")}
           description={caseDetail.caseNumber}
           onClose={closeCaseDeleteConfirmation}
           closeDisabled={isDeletingCase}
@@ -3745,8 +4224,11 @@ export function AdminCaseDetailPage({ caseId }: Props) {
           <div className="grid gap-4">
             <InlineError message={caseDeleteError} />
             <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-900">
-              确定删除该案件吗？删除后，案件、资料项、上传文件记录、客户访问链接、变更履历和通知记录都会被移除。
-              客户资料本身不会删除。此操作无法撤销。
+              {localText(
+                locale,
+                "确定删除该案件吗？删除后，案件、资料项、上传文件记录、客户访问链接、变更履历和通知记录都会被移除。客户资料本身不会删除。此操作无法撤销。",
+                "この案件を削除しますか。削除後、案件、資料項目、アップロードファイル記録、お客様リンク、変更履歴、通知記録は削除されます。お客様情報自体は削除されません。この操作は取り消せません。",
+              )}
             </div>
             <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button
@@ -3755,7 +4237,7 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                 onClick={closeCaseDeleteConfirmation}
                 className="w-full rounded-2xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 sm:w-auto"
               >
-                取消
+                {localText(locale, "取消", "キャンセル")}
               </button>
               <button
                 type="button"
@@ -3764,7 +4246,9 @@ export function AdminCaseDetailPage({ caseId }: Props) {
                 className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:bg-slate-300 sm:w-auto"
               >
                 {isDeletingCase ? <SubmitSpinner /> : null}
-                {isDeletingCase ? "删除中..." : "确认删除案件"}
+                {isDeletingCase
+                  ? localText(locale, "删除中...", "削除中...")
+                  : localText(locale, "确认删除案件", "案件を削除")}
               </button>
             </div>
           </div>
@@ -3773,27 +4257,30 @@ export function AdminCaseDetailPage({ caseId }: Props) {
 
       {filePreview ? (
         <Modal
-          title="文件预览"
+          title={localText(locale, "文件预览", "ファイルプレビュー")}
           description={displayChineseText(filePreview.fileName)}
           onClose={closeFilePreview}
         >
           <div className="grid gap-4">
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
               <iframe
-                title="文件预览"
+                title={localText(locale, "文件预览", "ファイルプレビュー")}
                 src={filePreview.fileUrl}
                 className="h-[60vh] w-full bg-white"
               />
             </div>
             <div className="flex flex-col gap-3 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-              <span>短期预览链接，过期时间：{formatDateTime(filePreview.expiresAt)}</span>
+              <span>
+                {localText(locale, "短期预览链接，过期时间：", "一時プレビューリンク。有効期限：")}
+                {formatDateTime(filePreview.expiresAt)}
+              </span>
               <a
                 href={filePreview.fileUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex justify-center rounded-2xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
               >
-                新窗口打开 / 下载
+                {localText(locale, "新窗口打开 / 下载", "新しいウィンドウで開く / ダウンロード")}
               </a>
             </div>
           </div>
