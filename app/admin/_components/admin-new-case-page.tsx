@@ -60,6 +60,14 @@ type CustomItemForm = {
   isCollapsed: boolean;
 };
 
+function createPortalAccessUrl(plaintextToken: string): string {
+  if (typeof window === "undefined") {
+    return `/portal/${encodeURIComponent(plaintextToken)}`;
+  }
+
+  return `${window.location.origin}/portal/${encodeURIComponent(plaintextToken)}`;
+}
+
 const currentVisaTypes = [
   "无",
   "高度専門職 学术研究",
@@ -159,7 +167,7 @@ const newCaseText = {
       created: "案件已创建",
       createToken: "创建客户访问链接",
       tokenCreated: "客户访问链接已创建",
-      copyToken: "复制访问令牌",
+      copyToken: "复制客户链接",
       openCase: "打开案件详情",
     },
     messages: {
@@ -177,8 +185,8 @@ const newCaseText = {
       noCustomerName: "尚未填写客户姓名",
       noSelectedTemplate: "尚未选择模板",
       createTokenAfterCase: "案件创建后可以选择创建客户访问链接。",
-      tokenOnceTitle: "明文访问令牌只显示一次。",
-      tokenOnceDescription: "离开或刷新页面后无法再次查看明文访问令牌。请立即复制，并通过安全渠道发送给客户。",
+      tokenOnceTitle: "客户访问链接只显示一次。",
+      tokenOnceDescription: "离开或刷新页面后无法再次查看客户访问链接。请立即复制，并通过安全渠道发送给客户。",
       noFixedExpiry: "无固定过期时间",
       notSelected: "未选择",
       notCreated: "未创建",
@@ -197,11 +205,11 @@ const newCaseText = {
       createCase: "案件创建失败，请检查材料选择后重试。",
       createTokenFirstCase: "请先创建案件，再创建客户访问链接。",
       createToken: "客户访问链接创建失败。案件已创建，可以稍后在详情页重试。",
-      copyFailed: "复制失败，请手动复制访问令牌文本。",
+      copyFailed: "复制失败，请手动复制客户访问链接。",
     },
     success: {
       caseCreated: "案件 {caseNumber} 已创建，已生成 {count} 个材料项。",
-      tokenCreated: "客户访问链接已创建。明文访问令牌只在当前界面显示一次。",
+      tokenCreated: "客户访问链接已创建。完整访问链接只在当前界面显示一次。",
       copied: "已复制。请只通过安全渠道发送给客户。",
       createdSummary: "已创建：{caseNumber}，材料项 {count} 个。",
       selectedSummary: "已选择 {selected} 项，排除 {excluded} 项，自定义 {custom} 项",
@@ -296,7 +304,7 @@ const newCaseText = {
       created: "案件作成済み",
       createToken: "お客様リンクを作成",
       tokenCreated: "お客様リンク作成済み",
-      copyToken: "アクセストークンをコピー",
+      copyToken: "お客様リンクをコピー",
       openCase: "案件詳細を開く",
     },
     messages: {
@@ -314,7 +322,7 @@ const newCaseText = {
       noCustomerName: "お客様名が未入力です",
       noSelectedTemplate: "テンプレートが未選択です",
       createTokenAfterCase: "案件作成後にお客様リンクを作成できます。",
-      tokenOnceTitle: "平文アクセストークンは一度だけ表示されます。",
+      tokenOnceTitle: "お客様リンクは一度だけ表示されます。",
       tokenOnceDescription: "画面を離れる、または更新すると再表示できません。今すぐコピーし、安全な方法でお客様へ送付してください。",
       noFixedExpiry: "固定の有効期限なし",
       notSelected: "未選択",
@@ -334,11 +342,11 @@ const newCaseText = {
       createCase: "案件作成に失敗しました。資料選択を確認してから再度お試しください。",
       createTokenFirstCase: "先に案件を作成してからお客様リンクを作成してください。",
       createToken: "お客様リンクの作成に失敗しました。案件は作成済みのため、後で詳細画面から再試行できます。",
-      copyFailed: "コピーに失敗しました。アクセストークンを手動で選択してください。",
+      copyFailed: "コピーに失敗しました。お客様リンクを手動で選択してください。",
     },
     success: {
       caseCreated: "案件 {caseNumber} を作成し、資料項目 {count} 件を生成しました。",
-      tokenCreated: "お客様リンクを作成しました。平文アクセストークンはこの画面で一度だけ表示されます。",
+      tokenCreated: "お客様リンクを作成しました。完全なアクセスリンクはこの画面で一度だけ表示されます。",
       copied: "コピーしました。安全な方法でのみお客様へ送付してください。",
       createdSummary: "作成済み：{caseNumber}、資料項目 {count} 件。",
       selectedSummary: "選択済み {selected} 件、除外 {excluded} 件、追加 {custom} 件",
@@ -771,7 +779,7 @@ export function AdminNewCasePage() {
     }
 
     try {
-      await navigator.clipboard.writeText(createdToken.plaintextToken);
+      await navigator.clipboard.writeText(createPortalAccessUrl(createdToken.plaintextToken));
       setTokenCopyMessage(text.success.copied);
     } catch {
       setTokenCopyMessage(text.errors.copyFailed);
@@ -1387,7 +1395,9 @@ export function AdminNewCasePage() {
                     <p className="mt-1 text-xs leading-5">
                       {text.messages.tokenOnceDescription}
                     </p>
-                    <code className="mt-2 block break-all rounded bg-white p-3">{createdToken.plaintextToken}</code>
+                    <code className="mt-2 block break-all rounded bg-white p-3">
+                      {createPortalAccessUrl(createdToken.plaintextToken)}
+                    </code>
                     <div className="mt-3 flex flex-wrap items-center gap-3">
                       <button
                         type="button"
