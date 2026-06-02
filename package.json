@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "postinstall": "prisma generate",
     "start": "next start",
     "test": "vitest run --exclude \"**/*.integration.test.ts\" --exclude \"e2e/**\"",
     "test:e2e": "playwright test",
